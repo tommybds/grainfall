@@ -36,6 +36,7 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 - **Dash** (cooldown) + upgrades associés
 - **Menu** de sélection (carte / difficulté / héros)
 - **High score** persistant sur l’appareil (local)
+- **Stats détaillées + succès** (persistants) + écran dédié
 
 ## Gameplay (mécaniques)
 
@@ -73,12 +74,17 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 - **Shotgun**: multi-projectiles + knockback.
 - **Lance**: tir puissant, **perce** + applique un petit saignement.
 - **Flamethrower**: portée courte en cône, applique une brûlure (DOT).
+- **Laser**: rayon traversant (hitscan) + brûlure.
+- **Mine**: pose au sol, explosion en zone.
+- **Boomerang**: aller/retour + ricochets.
+- **Tesla**: chaînes entre ennemis proches.
+- **Tourelle**: spawn temporaire qui tire automatiquement.
 
 ### Upgrades (choix à chaque level up)
 
 - **Armes**: `UNLOCK` / `UP` d’une arme (jusqu’à lvl 7).
 - **Buffs**: `FIRE +` (cadence), `DMG +` (dégâts), `SPD +` (vitesse).
-- **Perks**: `RICOCHET +`, `HP MAX +`, `MAGNET +`, `DASH +`.
+- **Perks**: `RICOCHET +`, `HP MAX +`, `MAGNET +`, `DASH +`, `EXÉCUTE`, `CRIT +`, `CRIT BURN`, `BRÛLURE PROPAGE`.
 
 ### Pickups
 
@@ -149,6 +155,8 @@ npm run serve:dist
   - P: pause
   - R: recommencer
   - 1/2/3: carte — 4/5/6: difficulté — 7/8/9: héros
+  - Menu d’upgrade: ZQSD/Flèches pour sélectionner, Entrée/Espace pour valider (1/2/3 toujours OK)
+  - Stats/Succès: bouton dans le menu (Esc pour revenir)
 - **Mobile (tactile)**
   - drag en bas à gauche **ou** en bas à droite: déplacer (joystick)
   - bouton **PAUSE** en haut: ouvrir le menu pause

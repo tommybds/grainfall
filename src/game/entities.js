@@ -37,6 +37,12 @@ export function createPlayer(hero) {
       magnetMul: 1,
       dashCdMul: 1,
       dashPowMul: 1,
+      // synergies
+      critChance: 0,
+      critMul: 1.6,
+      critBurn: false,
+      executeMul: 1,
+      burnSpread: 0,
     },
   };
   // apply start weapons
@@ -60,8 +66,9 @@ export function createBullet({
   bleedDps = 0,
   bleedT = 0,
   kind = "bullet",
+  ...rest
 }) {
-  return { x, y, vx, vy, dmg, ttl, r, pierce, knock, bleedDps, bleedT, kind };
+  return { x, y, vx, vy, dmg, ttl, r, pierce, knock, bleedDps, bleedT, kind, ...rest };
 }
 
 export function createPickup({ x, y, kind, value = 1 }) {
@@ -126,6 +133,83 @@ export function createEnemy({ x, y, kind, wave, diff }) {
       windDx: 0,
       windDy: 0,
       windDmg: 0,
+    };
+  }
+  if (kind === "shield") {
+    const hpMax = (56 + wave * 9 + randRange(0, 18)) * mHp;
+    return {
+      kind,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: 12,
+      hp: hpMax,
+      hpMax,
+      speed: (34 + wave * 1.6 + randRange(0, 6)) * mSp,
+      dmgMul: 1.15,
+      xp: 3,
+      isBoss: false,
+      shieldMul: 0.42, // frontal damage multiplier
+    };
+  }
+  if (kind === "charger") {
+    const hpMax = (40 + wave * 7 + randRange(0, 14)) * mHp;
+    return {
+      kind,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: 10,
+      hp: hpMax,
+      hpMax,
+      speed: (52 + wave * 2.2 + randRange(0, 10)) * mSp,
+      dmgMul: 1.1,
+      xp: 2,
+      isBoss: false,
+      chargeCd: randRange(0.8, 1.8),
+      chargeWindT: 0,
+      chargeT: 0,
+      chargeDx: 0,
+      chargeDy: 0,
+    };
+  }
+  if (kind === "exploder") {
+    const hpMax = (26 + wave * 5 + randRange(0, 10)) * mHp;
+    return {
+      kind,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: 10,
+      hp: hpMax,
+      hpMax,
+      speed: (66 + wave * 2.6 + randRange(0, 12)) * mSp,
+      dmgMul: 1.0,
+      xp: 2,
+      isBoss: false,
+      boomR: 42,
+      boomDmg: 26 + wave * 1.2,
+    };
+  }
+  if (kind === "summoner") {
+    const hpMax = (44 + wave * 8 + randRange(0, 16)) * mHp;
+    return {
+      kind,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: 11,
+      hp: hpMax,
+      hpMax,
+      speed: (30 + wave * 1.2 + randRange(0, 6)) * mSp,
+      dmgMul: 1.0,
+      xp: 3,
+      isBoss: false,
+      summonCd: randRange(1.2, 2.6),
     };
   }
   if (kind === "boss") {

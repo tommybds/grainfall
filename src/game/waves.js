@@ -94,6 +94,10 @@ export function updateWaves(dt, game) {
     { item: "fast", w: Math.max(0, w - 1) * 1.4 },
     { item: "tank", w: Math.max(0, w - 2) * 0.9 },
     { item: "spitter", w: Math.max(0, w - 3) * 1.1 },
+    { item: "shield", w: Math.max(0, w - 4) * 0.8 },
+    { item: "charger", w: Math.max(0, w - 4) * 0.9 },
+    { item: "exploder", w: Math.max(0, w - 5) * 1.0 },
+    { item: "summoner", w: Math.max(0, w - 6) * 0.8 },
   ];
 
   while (s.spawnAcc >= 1) {

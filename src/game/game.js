@@ -3,7 +3,7 @@ import { createViewport, resizeCanvasToViewport, dtFromMs } from "../core/viewpo
 import { createInput, attachInputListeners } from "../core/input.js";
 import { attachTouchJoystick } from "../core/touch.js";
 import { CFG } from "./config.js";
-import { createPlayer, createEnemy } from "./entities.js";
+import { createPlayer, createEnemy, createBullet } from "./entities.js";
 import { updateWaves, spawnEnemyAtEdge } from "./waves.js";
 import { updateWeapons } from "./weapons.js";
 import { updateEnemies, updateBullets, updateEnemyBullets } from "./combat.js";
@@ -13,9 +13,10 @@ import { len2 } from "../core/math.js";
 import { mapById } from "./maps.js";
 import { difficultyById } from "./difficulty.js";
 import { heroById } from "./heroes.js";
-import { loadHighScore, saveHighScore } from "./storage.js";
+import { loadHighScore, loadSignedLocal, saveHighScore, saveSignedLocal } from "./storage.js";
 import { createAudio } from "../audio/audio.js";
 import { sampleTile, resolveCircleVsWalls, worldToCell } from "./world.js";
+import { createLifetimeStats, createRunStats, recordRunEnd, updateAchievements } from "./stats.js";
 
 export function createGame({ canvas, ctx, hudEl, overlayEl }) {
   const viewport = createViewport();
@@ -54,6 +55,13 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       upgradeMenu: false,
       upgradeRemaining: 0,
       upgradeChoices: [],
+      upgradeCursor: 0,
+
+      // stats/achievements overlay
+      statsMenu: false,
+
+      // tutorial overlay
+      tutorialMenu: false,
 
       // lightweight objective per run
       objective: null,
@@ -65,6 +73,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     enemyBullets: [],
     pickups: [],
     floats: [],
+    turrets: [],
     discoveredPickups: { xp: false, heal: false, buff: false, chest: false },
 
     theme: mapById("classic").theme,
@@ -73,6 +82,8 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     selectedHeroId: "runner",
 
     highScore: { bestKills: 0, bestWave: 0 },
+    lifetimeStats: createLifetimeStats(),
+    runStats: createRunStats(),
     audio: createAudio(),
     audioMuted: true,
 
@@ -105,6 +116,13 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.highScore = hs;
   });
 
+  // async init (signed lifetime stats in localStorage)
+  loadSignedLocal("stats_v1", createLifetimeStats()).then((st) => {
+    game.lifetimeStats = st || createLifetimeStats();
+    // ensure achievements entries exist
+    updateAchievements(game.lifetimeStats);
+  });
+
   // start muted until user interaction unlocks audio
   game.audio.setMuted(true);
 
@@ -128,16 +146,21 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.upgradeMenu = false;
     game.state.upgradeRemaining = 0;
     game.state.upgradeChoices = [];
+    game.state.upgradeCursor = 0;
+    game.state.statsMenu = false;
+    game.state.tutorialMenu = false;
 
     game.state.objective = createObjective();
 
     game.state.diff = difficultyById(game.selectedDifficultyId);
     game.player = createPlayer(heroById(game.selectedHeroId));
+    game.runStats = createRunStats();
     game.enemies.length = 0;
     game.bullets.length = 0;
     game.enemyBullets.length = 0;
     game.pickups.length = 0;
     game.floats.length = 0;
+    game.turrets.length = 0;
     game.discoveredPickups = { xp: false, heal: false, buff: false, chest: false };
     game.camera.x = 0;
     game.camera.y = 0;
@@ -163,6 +186,8 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
   function setPaused(paused) {
     if (!game.state.running || game.state.gameOver) return;
     if (game.state.upgradeMenu) return;
+    if (game.state.statsMenu) return;
+    if (game.state.tutorialMenu) return;
     game.state.paused = !!paused;
     game.overlayEl.style.opacity = game.state.paused ? "1" : "0";
     game.overlayEl.dataset.active = game.state.paused ? "true" : "false";
@@ -180,6 +205,21 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       game.highScore = { bestKills: newBestKills, bestWave: newBestWave };
       await saveHighScore(game.highScore);
       game.floats.push({ x: game.player.x, y: game.player.y - 34, ttl: 1.6, text: "NEW HIGHSCORE" });
+    }
+
+    // Persist lifetime stats (signed)
+    try {
+      recordRunEnd({
+        run: game.runStats,
+        lifetime: game.lifetimeStats,
+        timeSec: game.state.t || 0,
+        wave: game.state.wave || 1,
+        kills: game.state.kills || 0,
+      });
+      updateAchievements(game.lifetimeStats);
+      await saveSignedLocal("stats_v1", game.lifetimeStats);
+    } catch {
+      // ignore
     }
     game.audio?.death?.();
   }
@@ -199,6 +239,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.upgradeMenu = true;
     game.state.upgradeRemaining = Math.max(1, (game.state.upgradeRemaining || 0) + count);
     game.state.upgradeChoices = generateUpgradeChoices(game);
+    game.state.upgradeCursor = 0;
     // freeze gameplay but keep overlay interaction
     game.state.paused = true;
     game.overlayEl.style.opacity = "1";
@@ -212,10 +253,12 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.upgradeRemaining = Math.max(0, (game.state.upgradeRemaining || 1) - 1);
     if (game.state.upgradeRemaining > 0) {
       game.state.upgradeChoices = generateUpgradeChoices(game);
+      game.state.upgradeCursor = 0;
       return;
     }
     game.state.upgradeMenu = false;
     game.state.upgradeChoices = [];
+    game.state.upgradeCursor = 0;
     game.state.paused = false;
     game.overlayEl.style.opacity = "0";
     game.overlayEl.dataset.active = "false";
@@ -453,6 +496,55 @@ function update(dt, game) {
   }
   updateBullets(dt, game);
   updateEnemyBullets(dt, game);
+
+  // turrets (temporary spawns)
+  if (game.turrets && game.turrets.length) {
+    for (let i = game.turrets.length - 1; i >= 0; i--) {
+      const t = game.turrets[i];
+      t.ttl -= dt;
+      if (t.ttl <= 0) {
+        game.turrets.splice(i, 1);
+        continue;
+      }
+      t.cd -= dt;
+      if (t.cd > 0) continue;
+      if (!game.enemies.length) continue;
+      // pick nearest enemy to turret within range
+      let best = null;
+      let bestD2 = Infinity;
+      for (let k = 0; k < game.enemies.length; k++) {
+        const e = game.enemies[k];
+        const dx = e.x - t.x;
+        const dy = e.y - t.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD2) {
+          bestD2 = d2;
+          best = e;
+        }
+      }
+      const r2 = (t.range || 160) * (t.range || 160);
+      if (!best || bestD2 > r2) continue;
+      const d = Math.sqrt(bestD2) || 1;
+      const vx = ((best.x - t.x) / d) * 420;
+      const vy = ((best.y - t.y) / d) * 420;
+      if (game.bullets.length < CFG.maxBullets) {
+        game.bullets.push(
+          createBullet({
+            x: t.x,
+            y: t.y,
+            vx,
+            vy,
+            dmg: t.dmg || 10,
+            ttl: 1.1,
+            r: 3,
+            kind: "turret",
+          }),
+        );
+      }
+      const rate = t.rate || 2.0;
+      t.cd = 1 / rate;
+    }
+  }
 
   // pickups: lifetime + pickup radius
   for (let i = game.pickups.length - 1; i >= 0; i--) {

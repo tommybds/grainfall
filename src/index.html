@@ -55,7 +55,13 @@
           <span class="sub">ASCII / Noir &amp; Blanc</span>
         </div>
         <div class="hudWrap">
-          <div class="hud" id="hud"></div>
+          <div class="hudCol">
+            <div class="hud" id="hud"></div>
+            <div class="hpBar" id="hpBar">
+              <div class="hpFill" id="hpFill"></div>
+              <div class="hpText" id="hpText">HP</div>
+            </div>
+          </div>
           <button id="btnSoundTop" class="pauseBtn" type="button" aria-label="Son">SND</button>
           <button id="btnPauseTop" class="pauseBtn" type="button" aria-label="Pause">PAUSE</button>
           <button id="btnDashTop" class="pauseBtn" type="button" aria-label="Dash">DASH</button>
@@ -110,6 +116,7 @@
                 <div class="mapsTitle">HÉROS</div>
                 <div class="mapList">
                   <button class="heroBtn" type="button" data-hero="runner" aria-selected="true">7 — Runner</button>
+                  <button class="heroBtn" type="button" data-hero="pyro" aria-selected="false">0 — Pyro</button>
                   <button class="heroBtn" type="button" data-hero="tank" aria-selected="false">8 — Tank</button>
                   <button class="heroBtn" type="button" data-hero="gunner" aria-selected="false">9 — Gunner</button>
                 </div>
@@ -129,6 +136,12 @@
               </div>
               <div class="menuBtns menuBtns--single">
                 <button id="btnStart" class="menuBtn" type="button">Démarrer</button>
+              </div>
+              <div class="menuBtns menuBtns--single">
+                <button id="btnStats" class="menuBtn" type="button">Stats / Succès</button>
+              </div>
+              <div class="menuBtns menuBtns--single">
+                <button id="btnTutorial" class="menuBtn" type="button">Tutoriel</button>
               </div>
               <div class="rules">
                 <div><span class="k">Déplacement</span> ZQSD/WASD (auto) / Flèches</div>
@@ -160,6 +173,7 @@
                 <button id="btnResume" class="menuBtn" type="button">Reprendre</button>
                 <button id="btnRestart" class="menuBtn" type="button">Recommencer</button>
                 <button id="btnMenu" class="menuBtn" type="button">Menu</button>
+                <button id="btnStatsPause" class="menuBtn" type="button">Stats</button>
               </div>
               <div class="hint">Astuce: les héros ont des stats différentes (HP/vitesse/range/armes).</div>
               <div class="links">
@@ -172,6 +186,53 @@
               </div>
             </div>
 
+            <div id="statsMenu" hidden>
+              <div class="mapsTitle">STATS</div>
+              <div class="endStats">
+                <div class="statsGrid" id="statsGrid"></div>
+              </div>
+              <div class="mapsTitle">SUCCÈS</div>
+              <div class="achList" id="achList"></div>
+              <div class="menuBtns menuBtns--single">
+                <button id="btnStatsBack" class="menuBtn" type="button">Retour</button>
+              </div>
+            </div>
+
+            <div id="tutorialMenu" hidden>
+              <div class="mapsTitle">TUTORIEL</div>
+              <div class="tutoBlock">
+                <div class="tutoTitle">But</div>
+                <div class="tutoText">Survis, ramasse de l'XP, monte de niveau, et construis ton build.</div>
+              </div>
+              <div class="tutoBlock">
+                <div class="tutoTitle">Contrôles</div>
+                <div class="tutoText">
+                  Déplacement: ZQSD/WASD ou Flèches. Dash: Espace/Shift. Pause: P. Restart: R.
+                </div>
+              </div>
+              <div class="tutoBlock">
+                <div class="tutoTitle">Pickups</div>
+                <div class="tutoText">
+                  <span class="k">*</span> XP · <span class="k">+</span> Heal · <span class="k">!</span> Buff (1 upgrade) · <span class="k">¤</span> Chest (2 upgrades)
+                </div>
+              </div>
+              <div class="tutoBlock">
+                <div class="tutoTitle">Upgrades</div>
+                <div class="tutoText">
+                  Menu d'upgrade: ZQSD/Flèches pour sélectionner, Entrée/Espace pour valider (1/2/3 OK).
+                </div>
+              </div>
+              <div class="tutoBlock">
+                <div class="tutoTitle">Lien</div>
+                <div class="tutoText">
+                  <a class="ghLink" href="https://github.com/tommybds/grainfall#contr%C3%B4les" target="_blank" rel="noopener noreferrer">Voir le README</a>
+                </div>
+              </div>
+              <div class="menuBtns menuBtns--single">
+                <button id="btnTutorialBack" class="menuBtn" type="button">Retour</button>
+              </div>
+            </div>
+
             <div id="upgradeMenu" hidden>
               <div class="mapsTitle">UPGRADE</div>
               <div class="upgradeGrid">
@@ -179,6 +240,7 @@
                 <button id="btnUp1" class="menuBtn upgradeBtn" type="button">2 — ...</button>
                 <button id="btnUp2" class="menuBtn upgradeBtn" type="button">3 — ...</button>
               </div>
+              <div class="ownedWeps" id="ownedWeps"></div>
               <div class="hint" id="upgradeHint">Choisis 1–3.</div>
             </div>
           </div>

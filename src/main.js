@@ -86,6 +86,11 @@ function weaponLabel(id) {
   if (id === "shotgun") return "Shotgun";
   if (id === "lance") return "Lance";
   if (id === "flame") return "Flamethrower";
+  if (id === "laser") return "Laser";
+  if (id === "mine") return "Mine";
+  if (id === "boomerang") return "Boomerang";
+  if (id === "tesla") return "Tesla";
+  if (id === "turret") return "Turret";
   return id;
 }
 
@@ -142,7 +147,7 @@ const heroGroup = wireGroup({
     game.selectedHeroId = id;
     updateHeroCard(id);
   },
-  keys: { "7": 0, "8": 1, "9": 2 },
+  keys: { "7": 0, "0": 1, "8": 2, "9": 3 },
   enabledWhen: () => !game.state.running,
 });
 
@@ -158,11 +163,55 @@ window.addEventListener(
   "keydown",
   (e) => {
     if (!game.state?.upgradeMenu) return;
-    if (e.key === "1") game.chooseUpgrade?.(0);
-    else if (e.key === "2") game.chooseUpgrade?.(1);
-    else if (e.key === "3") game.chooseUpgrade?.(2);
-    else return;
-    e.preventDefault();
+
+    function setCursor(next) {
+      const n = Math.max(0, Math.min(2, next | 0));
+      game.state.upgradeCursor = n;
+      document.getElementById(`btnUp${n}`)?.focus?.();
+    }
+
+    const code = e.code;
+    const key = e.key;
+    const cur = game.state.upgradeCursor || 0;
+
+    // Direct pick (keeps existing behavior)
+    if (key === "1") {
+      setCursor(0);
+      game.chooseUpgrade?.(0);
+      e.preventDefault();
+      return;
+    }
+    if (key === "2") {
+      setCursor(1);
+      game.chooseUpgrade?.(1);
+      e.preventDefault();
+      return;
+    }
+    if (key === "3") {
+      setCursor(2);
+      game.chooseUpgrade?.(2);
+      e.preventDefault();
+      return;
+    }
+
+    // Navigate (vertical)
+    if (code === "ArrowUp" || code === "KeyW" || code === "KeyZ") {
+      setCursor(cur - 1);
+      e.preventDefault();
+      return;
+    }
+    if (code === "ArrowDown" || code === "KeyS") {
+      setCursor(cur + 1);
+      e.preventDefault();
+      return;
+    }
+
+    // Confirm
+    if (key === "Enter" || code === "Space") {
+      game.chooseUpgrade?.(cur);
+      e.preventDefault();
+      return;
+    }
   },
   { passive: false },
 );
@@ -182,6 +231,69 @@ btnRestart?.addEventListener("click", () => game.goToMenu());
 btnMenu?.addEventListener("click", () => game.goToMenu());
 btnEndRestart?.addEventListener("click", () => game.start());
 btnEndMenu?.addEventListener("click", () => game.goToMenu());
+
+// --- Stats / Achievements menu ---
+const btnStats = document.getElementById("btnStats");
+const btnStatsPause = document.getElementById("btnStatsPause");
+const btnStatsBack = document.getElementById("btnStatsBack");
+
+function openStatsMenu() {
+  game.state.statsMenu = true;
+  // keep overlay visible
+  game.overlayEl.style.opacity = "1";
+  game.overlayEl.dataset.active = "true";
+  if (game.state.running) game.state.paused = true;
+}
+
+function closeStatsMenu() {
+  game.state.statsMenu = false;
+}
+
+btnStats?.addEventListener("click", openStatsMenu);
+btnStatsPause?.addEventListener("click", openStatsMenu);
+btnStatsBack?.addEventListener("click", closeStatsMenu);
+
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (!game.state?.statsMenu) return;
+    if (e.key === "Escape") {
+      closeStatsMenu();
+      e.preventDefault();
+    }
+  },
+  { passive: false },
+);
+
+// --- Tutorial menu ---
+const btnTutorial = document.getElementById("btnTutorial");
+const btnTutorialBack = document.getElementById("btnTutorialBack");
+
+function openTutorialMenu() {
+  game.state.tutorialMenu = true;
+  game.overlayEl.style.opacity = "1";
+  game.overlayEl.dataset.active = "true";
+  if (game.state.running) game.state.paused = true;
+}
+
+function closeTutorialMenu() {
+  game.state.tutorialMenu = false;
+}
+
+btnTutorial?.addEventListener("click", openTutorialMenu);
+btnTutorialBack?.addEventListener("click", closeTutorialMenu);
+
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (!game.state?.tutorialMenu) return;
+    if (e.key === "Escape") {
+      closeTutorialMenu();
+      e.preventDefault();
+    }
+  },
+  { passive: false },
+);
 
 // Mobile-friendly pause button in the top bar
 const btnPauseTop = document.getElementById("btnPauseTop");

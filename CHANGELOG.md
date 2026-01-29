@@ -2,6 +2,16 @@
 
 Ce projet suit le format de [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) et applique (au mieux) la sémantique de versionnage.
 
+## [0.3.0] - 2026-01-29
+
+### Added
+- **Nouvelles armes**: Laser, Mine, Boomerang, Tesla, Tourelle.
+- **Synergies/Perks**: EXÉCUTE, CRIT+, CRIT BURN, BRÛLURE PROPAGE.
+- **Nouveaux ennemis**: Shield (réduit dégâts frontaux), Chargeur (dash), Exploseur (kamikaze), Invocateur (adds).
+- **Stats détaillées + Succès** (persistants, signés) + écran dédié dans l’overlay.
+- **Upgrade menu** plus ergonomique: cartes + navigation clavier (ZQSD/Flèches + Entrée/Espace).
+- Dans l’upgrade menu: affichage des **armes possédées + niveaux**.
+
 ## [0.2.0] - 2026-01-29
 
 ### Added
@@ -33,4 +43,5 @@ Ce projet suit le format de [Keep a Changelog](https://keepachangelog.com/en/1.1
 - `winter`: verglas uniquement (pas de boue).
 - Contrôles menu: désactivation des raccourcis de sélection pendant une run.
 
+[0.3.0]: https://github.com/tommybds/grainfall
 [0.2.0]: https://github.com/tommybds/grainfall

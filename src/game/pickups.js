@@ -1,7 +1,7 @@
 import { clamp } from "../core/math.js";
 import { CFG } from "./config.js";
 import { createPickup } from "./entities.js";
-import { ensureWeapon, upgradeWeapon, weaponName } from "./weapons.js";
+import { ensureWeapon, upgradeWeapon, weaponName, WEAPON_MAX_LEVEL } from "./weapons.js";
 
 export function generateUpgradeChoices(game) {
   const player = game.player;
@@ -15,22 +15,35 @@ export function generateUpgradeChoices(game) {
 
   // Always include at least one weapon-related choice.
   {
-    const options = ["pistol", "shotgun", "lance", "flame"];
+    const options = ["pistol", "shotgun", "lance", "flame", "laser", "mine", "boomerang", "tesla", "turret"];
     const owned = options.filter((id) => player.weapons.some((w) => w.id === id));
-    const missing = options.filter((id) => !player.weapons.some((w) => w.id === id));
-    const roll = Math.random();
-    const id =
-      owned.length && (roll < 0.65 || !missing.length)
-        ? owned[(Math.random() * owned.length) | 0]
-        : missing[(Math.random() * missing.length) | 0];
-    const has = player.weapons.some((w) => w.id === id);
-    pushUnique({
-      key: `weapon:${id}`,
-      kind: "weapon",
-      id,
-      title: `${has ? "UP" : "UNLOCK"} ${weaponName(id)}`,
-      desc: has ? "Améliore l'arme" : "Débloque l'arme",
+    const upgradable = owned.filter((id) => {
+      const w = player.weapons.find((x) => x.id === id);
+      return (w?.lvl || 1) < WEAPON_MAX_LEVEL;
     });
+    const missing = options.filter((id) => !player.weapons.some((w) => w.id === id));
+    // Bias toward UNLOCK until you have a few weapons (so new weapons appear sooner).
+    const wantUnlock = missing.length > 0 && (player.weapons.length < 4 ? Math.random() < 0.75 : Math.random() < 0.45);
+    // If everything is maxed and no weapon is missing, don't force a weapon choice.
+    if (!missing.length && !upgradable.length) {
+      // fall through: remaining slots will be filled by buffs/perks
+    } else {
+      const id = wantUnlock
+        ? missing[(Math.random() * missing.length) | 0]
+        : (upgradable.length
+            ? upgradable[(Math.random() * upgradable.length) | 0]
+            : missing[(Math.random() * missing.length) | 0]);
+      const has = player.weapons.some((w) => w.id === id);
+      const curLvl = (player.weapons.find((w) => w.id === id)?.lvl || 1);
+      const nextLbl = has ? `(${Math.min(curLvl + 1, WEAPON_MAX_LEVEL)}/${WEAPON_MAX_LEVEL})` : `(1/${WEAPON_MAX_LEVEL})`;
+      pushUnique({
+        key: `weapon:${id}`,
+        kind: "weapon",
+        id,
+        title: `${has ? "UP" : "UNLOCK"} ${weaponName(id)} ${nextLbl}`,
+        desc: has ? "Améliore l'arme (jusqu'au max)" : "Débloque l'arme",
+      });
+    }
   }
 
   // Fill remaining with buffs/perks.
@@ -42,6 +55,10 @@ export function generateUpgradeChoices(game) {
     { key: "perk:hp", kind: "perk", id: "hp", title: "HP MAX +", desc: "+10 PV max (heal inclus)" },
     { key: "perk:mag", kind: "perk", id: "mag", title: "MAGNET +", desc: "Attire les bonus de plus loin" },
     { key: "perk:dash", kind: "perk", id: "dash", title: "DASH +", desc: "Dash plus souvent et plus loin" },
+    { key: "perk:crit", kind: "perk", id: "crit", title: "CRIT +", desc: "+ chance de crit (et un peu + dmg crit)" },
+    { key: "perk:critburn", kind: "perk", id: "critburn", title: "CRIT BURN", desc: "Crit applique une brûlure" },
+    { key: "perk:execute", kind: "perk", id: "execute", title: "EXÉCUTE", desc: "+ dégâts sur ennemis < 20% HP" },
+    { key: "perk:burnspread", kind: "perk", id: "burnspread", title: "BRÛLURE PROPAGE", desc: "La brûlure se propage aux ennemis proches" },
   ];
 
   while (choices.length < 3) {
@@ -57,8 +74,12 @@ export function applyUpgradeChoice(game, choice) {
   if (!choice) return;
   if (choice.kind === "weapon") {
     const has = player.weapons.some((w) => w.id === choice.id);
+    const before = player.weapons.find((w) => w.id === choice.id)?.lvl || 1;
     const w = has ? upgradeWeapon(player, choice.id) : ensureWeapon(player, choice.id);
-    game.floats.push({ x: player.x, y: player.y - 22, ttl: 1.25, text: `${weaponName(w.id)} ${has ? "UP" : "UNLOCK"}` });
+    const after = w?.lvl || 1;
+    const status = after >= WEAPON_MAX_LEVEL ? "MAX" : `${after}/${WEAPON_MAX_LEVEL}`;
+    const label = has ? (after === before ? "MAX" : "UP") : "UNLOCK";
+    game.floats.push({ x: player.x, y: player.y - 22, ttl: 1.25, text: `${weaponName(w.id)} ${label} (${status})` });
     return;
   }
   if (choice.kind === "buff") {
@@ -89,6 +110,28 @@ export function applyUpgradeChoice(game, choice) {
       player.buffs.dashCdMul = clamp((player.buffs.dashCdMul || 1) - 0.10, 0.55, 1);
       player.buffs.dashPowMul = clamp((player.buffs.dashPowMul || 1) + 0.08, 1, 1.8);
       game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "DASH +" });
+      return;
+    }
+    if (choice.id === "crit") {
+      player.buffs.critChance = clamp((player.buffs.critChance || 0) + 0.05, 0, 0.35);
+      player.buffs.critMul = clamp((player.buffs.critMul || 1.6) + 0.08, 1.6, 2.4);
+      game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "CRIT +" });
+      return;
+    }
+    if (choice.id === "critburn") {
+      player.buffs.critBurn = true;
+      game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "CRIT BURN" });
+      return;
+    }
+    if (choice.id === "execute") {
+      player.buffs.executeMul = clamp((player.buffs.executeMul || 1) + 0.12, 1, 1.7);
+      game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "EXÉCUTE" });
+      return;
+    }
+    if (choice.id === "burnspread") {
+      player.buffs.burnSpread = clamp((player.buffs.burnSpread || 0) + 1, 0, 3);
+      game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "BRÛLURE PROPAGE" });
+      return;
     }
   }
 }

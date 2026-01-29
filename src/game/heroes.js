@@ -11,6 +11,17 @@ export const HEROES = [
     buffs: { fireRateMul: 1.0, moveSpeedMul: 1.05, dmgMul: 1.0 },
   },
   {
+    id: "pyro",
+    name: "Pyro",
+    desc: "Contrôle de zone, burn",
+    glyph: "~",
+    hpMax: 95,
+    speed: 180,
+    range: 120,
+    startWeapons: ["flame"],
+    buffs: { fireRateMul: 1.0, moveSpeedMul: 1.0, dmgMul: 1.0 },
+  },
+  {
     id: "tank",
     name: "Tank",
     desc: "Très tanky, plus lent",

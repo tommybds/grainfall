@@ -2,6 +2,8 @@ import { clamp } from "../core/math.js";
 import { CFG } from "../game/config.js";
 import { pickTerrainGlyph } from "./terrain.js";
 import { sampleTile } from "../game/world.js";
+import { ACHIEVEMENT_DEFS, formatTimeMMSS } from "../game/stats.js";
+import { weaponName, WEAPON_MAX_LEVEL } from "../game/weapons.js";
 
 function rgba(hex, a) {
   // hex like #rrggbb
@@ -200,10 +202,65 @@ export function renderFrame(game) {
     const b = bullets[i];
     const sx = b.x - camera.x;
     const sy = b.y - camera.y;
-    const a = Math.atan2(b.vy || 0, b.vx || 0);
     const kind = b.kind || "bullet";
-    const len = kind === "lance" ? 14 : kind === "shotgun" ? 8 : kind === "flame" ? 6 : 10; // pistol/bullet
-    const lw = kind === "lance" ? 3 : kind === "shotgun" ? 2.5 : kind === "flame" ? 4 : 2;
+
+    if (kind === "mine") {
+      // small pulsing dot on the ground
+      ctx.save();
+      const t = state.t || 0;
+      const pulse = 0.75 + 0.25 * Math.sin(t * 8 + i);
+      ctx.globalAlpha = (b.armT || 0) > 0 ? 0.45 : 0.85;
+      ctx.fillStyle = `rgba(255, 210, 90, ${0.4 + 0.4 * pulse})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 3 + pulse * 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+
+    if (kind === "explosionFx") {
+      const r = b.radius || 60;
+      const t = clamp((b.ttl || 0) / 0.22, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = 0.45 * (1 - t);
+      ctx.strokeStyle = "rgba(255, 210, 90, 0.85)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r * (1 - t), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
+    if (kind === "tesla" && Array.isArray(b.points) && b.points.length) {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = "rgba(140, 230, 255, 0.95)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      for (let p = 0; p < b.points.length; p++) {
+        const px = b.points[p].x - camera.x;
+        const py = b.points[p].y - camera.y;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
+    const a = Math.atan2(b.vy || 0, b.vx || 0);
+    const len =
+      kind === "laser"
+        ? Math.max(80, b.len || 520)
+        : kind === "lance"
+          ? 14
+          : kind === "shotgun"
+            ? 8
+            : kind === "flame"
+              ? 6
+              : 10; // pistol/bullet
+    const lw = kind === "laser" ? 3.5 : kind === "lance" ? 3 : kind === "shotgun" ? 2.5 : kind === "flame" ? 4 : 2;
     const col =
       kind === "pistol"
         ? "rgba(255, 220, 90, 0.95)" // warm yellow
@@ -211,13 +268,17 @@ export function renderFrame(game) {
           ? "rgba(255, 140, 90, 0.95)" // orange
           : kind === "lance"
             ? "rgba(140, 230, 255, 0.95)" // cyan
+            : kind === "laser"
+              ? "rgba(255, 90, 90, 0.95)"
+              : kind === "turret"
+                ? "rgba(255, 220, 90, 0.90)"
             : kind === "flame"
               ? `rgba(255, ${180 + ((Math.sin((state.t || 0) * 12 + i) * 25) | 0)}, 70, 0.92)` // flicker
             : fgDim;
     ctx.save();
     ctx.translate(sx, sy);
     ctx.rotate(a);
-    ctx.globalAlpha = 0.78;
+    ctx.globalAlpha = kind === "laser" ? 0.62 : 0.78;
     ctx.beginPath();
     ctx.moveTo(-len * 0.5, 0);
     ctx.lineTo(len * 0.5, 0);
@@ -253,6 +314,10 @@ export function renderFrame(game) {
     if (e.kind === "fast") ch = ">";
     else if (e.kind === "tank") ch = "#";
     else if (e.kind === "spitter") ch = "%";
+    else if (e.kind === "shield") ch = "]";
+    else if (e.kind === "charger") ch = "}";
+    else if (e.kind === "exploder") ch = "*";
+    else if (e.kind === "summoner") ch = "M";
     else if (e.isBoss) ch = "@";
     drawEntityChar(ctx, sx, sy, ch, e.isBoss ? 1 : 0.95);
 
@@ -268,8 +333,20 @@ export function renderFrame(game) {
       ctx.restore();
     }
 
+    // Telegraphed charger dash
+    if (e.kind === "charger" && (e.chargeWindT || 0) > 0) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      const t = clamp((e.chargeWindT || 0) / 0.28, 0, 1);
+      ctx.globalAlpha = 0.35 + 0.55 * (1 - t);
+      ctx.fillStyle = "rgba(255,160,90,0.95)";
+      ctx.font = `18px ${CFG.fontFamily}`;
+      drawEntityChar(ctx, sx, sy - 18, "!", 1);
+      ctx.restore();
+    }
+
     // hp bar above elites/boss
-    const elite = e.isBoss || e.kind === "tank" || e.kind === "spitter";
+    const elite = e.isBoss || e.kind === "tank" || e.kind === "spitter" || e.kind === "shield" || e.kind === "summoner";
     if (elite && (e.hpMax || 0) > 0) {
       const pct = clamp(e.hp / e.hpMax, 0, 1);
       const w = e.isBoss ? 48 : 34;
@@ -344,6 +421,23 @@ export function renderFrame(game) {
     }
   }
 
+  // turrets (temporary spawns)
+  if (Array.isArray(game.turrets) && game.turrets.length) {
+    ctx.save();
+    setTextStyle(ctx);
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < game.turrets.length; i++) {
+      const t = game.turrets[i];
+      const sx = t.x - camera.x;
+      const sy = t.y - camera.y;
+      drawSoftDisc(ctx, sx, sy, 18, 0.08);
+      ctx.fillStyle = rgba(theme.fg || CFG.fg, 0.92);
+      ctx.font = `${CFG.fontSize}px ${CFG.fontFamily}`;
+      drawEntityChar(ctx, sx, sy, "T", 0.95);
+    }
+    ctx.restore();
+  }
+
   // floating texts
   ctx.shadowBlur = 0;
   ctx.fillStyle = CFG.fgDim;
@@ -416,6 +510,10 @@ export function renderFrame(game) {
 
   // HUD + overlay text
   const hpPct = Math.round((player.hp / player.hpMax) * 100);
+  const hpFill = document.getElementById("hpFill");
+  const hpText = document.getElementById("hpText");
+  if (hpFill) hpFill.style.transform = `scaleX(${clamp((player.hp || 0) / (player.hpMax || 1), 0, 1)})`;
+  if (hpText) hpText.textContent = `HP ${Math.round(player.hp || 0)}/${Math.round(player.hpMax || 0)}`;
   const waveLeft = Math.max(0, CFG.waveSeconds - (state.t % CFG.waveSeconds));
   const wmm = Math.floor(waveLeft / 60);
   const wss = Math.floor(waveLeft % 60);
@@ -435,7 +533,6 @@ export function renderFrame(game) {
   }
 
   hudEl.innerHTML = [
-    `<span>HP <span class="v">${hpPct}%</span></span>`,
     `<span>LVL <span class="v">${player.level}</span></span>`,
     `<span>HERO <span class="v">${player.heroId ?? "?"}</span></span>`,
     `<span>ENEMIS <span class="v">${enemies.length}</span></span>`,
@@ -480,20 +577,112 @@ export function renderFrame(game) {
   const startMenu = document.getElementById("startMenu");
   const pauseMenu = document.getElementById("pauseMenu");
   const upgradeMenu = document.getElementById("upgradeMenu");
-  if (startMenu) startMenu.hidden = !!state.running || !!state.paused || !!state.gameOver || !!state.upgradeMenu;
-  if (pauseMenu) pauseMenu.hidden = !state.paused || !!state.upgradeMenu;
-  if (upgradeMenu) upgradeMenu.hidden = !state.upgradeMenu;
+  const statsMenu = document.getElementById("statsMenu");
+  const tutorialMenu = document.getElementById("tutorialMenu");
+  const overlayMenuActive = !!state.statsMenu || !!state.tutorialMenu;
+  if (startMenu)
+    startMenu.hidden = !!state.running || !!state.paused || !!state.gameOver || !!state.upgradeMenu || overlayMenuActive;
+  if (pauseMenu) pauseMenu.hidden = !state.paused || !!state.upgradeMenu || overlayMenuActive;
+  if (upgradeMenu) upgradeMenu.hidden = !state.upgradeMenu || overlayMenuActive;
+  if (statsMenu) statsMenu.hidden = !state.statsMenu;
+  if (tutorialMenu) tutorialMenu.hidden = !state.tutorialMenu;
+
+  // Stats UI (only when menu is open)
+  if (state.statsMenu) {
+    const grid = document.getElementById("statsGrid");
+    const ach = document.getElementById("achList");
+    const st = game.lifetimeStats || {};
+
+    if (grid) {
+      const topWeapons = Object.entries(st.killsByWeapon || {})
+        .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+        .slice(0, 4);
+      const topWeaponsStr = topWeapons.length ? topWeapons.map(([k, v]) => `${k}:${v}`).join(" ") : "-";
+
+      grid.innerHTML = [
+        `<div class="stat"><span class="k">Runs</span> <span class="v">${st.runs ?? 0}</span></div>`,
+        `<div class="stat"><span class="k">Kills</span> <span class="v">${st.killsTotal ?? 0}</span></div>`,
+        `<div class="stat"><span class="k">Best time</span> <span class="v">${formatTimeMMSS(st.bestTime ?? 0)}</span></div>`,
+        `<div class="stat"><span class="k">Best wave</span> <span class="v">${st.bestWave ?? 0}</span></div>`,
+        `<div class="stat"><span class="k">Best kills</span> <span class="v">${st.bestKills ?? 0}</span></div>`,
+        `<div class="stat"><span class="k">Top weps</span> <span class="v">${topWeaponsStr}</span></div>`,
+      ].join("");
+    }
+
+    if (ach) {
+      function progressFor(def) {
+        if (def.kind === "killsTotal") return st.killsTotal || 0;
+        if (def.kind === "bestTime") return st.bestTime || 0;
+        if (def.kind === "weapon") return st.killsByWeapon?.[def.key] || 0;
+        if (def.kind === "enemy") return st.killsByEnemy?.[def.key] || 0;
+        return 0;
+      }
+      ach.innerHTML = ACHIEVEMENT_DEFS.map((def) => {
+        const unlocked = !!st.achievements?.[def.id]?.unlocked;
+        const prog = progressFor(def);
+        const stateStr = unlocked ? "OK" : `${Math.min(prog, def.target)}/${def.target}`;
+        return `
+          <div class="achItem" data-unlocked="${unlocked ? "true" : "false"}">
+            <div class="achTop">
+              <div class="achTitle">${def.title}</div>
+              <div class="achState">${stateStr}</div>
+            </div>
+            <div class="achDesc">${def.desc}</div>
+          </div>
+        `;
+      }).join("");
+    }
+  }
 
   // Upgrade options UI
   if (state.upgradeMenu) {
     const btn0 = document.getElementById("btnUp0");
     const btn1 = document.getElementById("btnUp1");
     const btn2 = document.getElementById("btnUp2");
+    const owned = document.getElementById("ownedWeps");
     const h = document.getElementById("upgradeHint");
     const opts = state.upgradeChoices || [];
-    if (btn0) btn0.textContent = `1 — ${(opts[0]?.title ?? "…")} (${opts[0]?.desc ?? ""})`;
-    if (btn1) btn1.textContent = `2 — ${(opts[1]?.title ?? "…")} (${opts[1]?.desc ?? ""})`;
-    if (btn2) btn2.textContent = `3 — ${(opts[2]?.title ?? "…")} (${opts[2]?.desc ?? ""})`;
+
+    function tagFor(opt) {
+      if (!opt) return "";
+      if (opt.kind === "weapon") return "WEAPON";
+      if (opt.kind === "buff") return "BUFF";
+      if (opt.kind === "perk") return "PERK";
+      return String(opt.kind || "").toUpperCase();
+    }
+
+    function setBtn(btn, idx) {
+      if (!btn) return;
+      const opt = opts[idx];
+      const selected = (state.upgradeCursor || 0) === idx;
+      btn.classList.toggle("isSelected", selected);
+      btn.setAttribute("aria-selected", selected ? "true" : "false");
+      btn.dataset.idx = String(idx);
+      const key = String(idx + 1);
+      const title = opt?.title ?? "…";
+      const desc = opt?.desc ?? "";
+      const tag = tagFor(opt);
+      btn.innerHTML = `
+        <span class="upKey">${key}</span>
+        <span class="upBody">
+          <span class="upTitle">${title}</span>
+          <span class="upDesc">${desc}</span>
+        </span>
+        <span class="upTag">${tag}</span>
+      `;
+    }
+
+    setBtn(btn0, 0);
+    setBtn(btn1, 1);
+    setBtn(btn2, 2);
+
+    if (owned) {
+      const ws = (game.player?.weapons || []).slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      const list = ws
+        .map((w) => `${weaponName(w.id)} ${Math.min(w.lvl || 1, WEAPON_MAX_LEVEL)}/${WEAPON_MAX_LEVEL}`)
+        .join(" · ");
+      owned.innerHTML = `<span class="k">ARMES</span> <span class="v">${list || "-"}</span>`;
+    }
     if (h) h.textContent = `Choisis 1–3. (${Math.max(1, state.upgradeRemaining || 1)} restant)`;
   }
 
@@ -540,7 +729,13 @@ export function renderFrame(game) {
     ctx.restore();
   }
 
-  if (state.upgradeMenu) {
+  if (state.statsMenu) {
+    overlayEl.querySelector(".title").textContent = "STATS";
+    overlayEl.querySelector(".hint").textContent = "Esc pour revenir.";
+  } else if (state.tutorialMenu) {
+    overlayEl.querySelector(".title").textContent = "TUTORIEL";
+    overlayEl.querySelector(".hint").textContent = "Esc pour revenir.";
+  } else if (state.upgradeMenu) {
     overlayEl.querySelector(".title").textContent = "UPGRADE";
     overlayEl.querySelector(".hint").textContent = "Choisis 1–3 pour améliorer ton build.";
   } else if (state.gameOver) {

@@ -483,7 +483,7 @@ export function createAudio() {
       }
     } else {
       // Enemy hits: much quieter in music mode (and still readable in sfx mode).
-      noise({ dur: 0.014, gain: mode === "music" ? 0.007 : 0.05, out: sfxBus });
+      noise({ dur: 0.014, gain: mode === "music" ? 0.02 : 0.05, out: sfxBus });
     }
   }
 
@@ -544,7 +544,10 @@ export function createAudio() {
   }
 
   function setIntensity(v) {
-    intensity = clamp01(Number(v) || 0);
+    const x = clamp01(Number(v) || 0);
+    // Music mode should never start from total silence:
+    // keep a small baseline so pads/texture are audible from the start of a run.
+    intensity = mode === "music" ? Math.max(x, 0.22) : x;
   }
 
   function setMusicMeta(meta) {

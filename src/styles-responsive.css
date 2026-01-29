@@ -1,22 +1,43 @@
 /* Responsive rules extracted from styles.css */
 
-/* --- Desktop: compact 2-column menu when height is tight --- */
-@media (min-width: 720px) and (max-height: 820px) {
-  #startMenu {
-    column-count: 2;
-    column-gap: 14px;
+/* --- Desktop: make lists look like mobile (2 columns) --- */
+@media (min-width: 720px) {
+  /* Two-column lists for map/difficulty/heroes like mobile */
+  #startMenu .mapList {
+    grid-template-columns: 1fr 1fr;
   }
-  #startMenu > * {
-    break-inside: avoid;
-    -webkit-column-break-inside: avoid;
+
+  /* Compact, mobile-like truncation */
+  #startMenu .mapBtn,
+  #startMenu .diffBtn,
+  #startMenu .heroBtn,
+  #startMenu .menuBtn,
+  #startMenu .menuSelect {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  /* Slightly tighter spacing so everything fits */
-  .maps { margin-bottom: 10px; }
-  .mapList { gap: 5px; }
-  :is(.mapBtn, .diffBtn, .heroBtn) { padding: 9px 10px; }
-  .heroCard { margin-top: 8px; }
-  .menuBtns--single { margin-bottom: 8px; }
-  .hint { margin-top: 10px; }
+
+  /* Give the menu a bit more vertical room on desktop */
+  .panel {
+    max-height: calc(100vh - 24px);
+  }
+}
+
+/* --- Desktop: when height is tight, hide verbose blocks (avoid scroll) --- */
+@media (min-width: 720px) and (max-height: 860px) {
+  #startMenu .rules,
+  #startMenu .hint,
+  #startMenu .links {
+    display: none;
+  }
+  /* Hero card gets tall; keep it compact */
+  #startMenu .heroStats {
+    display: none;
+  }
+  #startMenu .heroCard {
+    padding: 8px 8px;
+  }
 }
 
 /* --- Mobile: prevent horizontal overflow that shifts layout (iOS/Chrome) --- */

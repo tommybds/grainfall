@@ -188,7 +188,10 @@ body {
   padding: 18px 18px 16px;
   max-height: calc(100vh - 56px);
   overflow-y: auto;
+  /* Hide ugly scrollbars (still scrollable) */
+  scrollbar-width: none; /* Firefox */
 }
+.panel::-webkit-scrollbar { display: none; } /* WebKit */
 
 /* Make menus clickable only when overlay is active (pause/menu/game over) */
 .overlay[data-active="true"] { pointer-events: auto; }

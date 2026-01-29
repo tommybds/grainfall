@@ -658,6 +658,13 @@ export function renderFrame(game) {
   if (statsMenu) statsMenu.hidden = !state.statsMenu;
   if (tutorialMenu) tutorialMenu.hidden = !state.tutorialMenu;
 
+  // Ensure overlay is interactive whenever a menu is visible.
+  // (Fixes cases where buttons look visible but are not clickable on some devices.)
+  const shouldOverlayBeActive =
+    !state.running || !!state.paused || !!state.gameOver || !!state.upgradeMenu || !!state.statsMenu || !!state.tutorialMenu;
+  overlayEl.dataset.active = shouldOverlayBeActive ? "true" : "false";
+  overlayEl.style.opacity = shouldOverlayBeActive ? "1" : "0";
+
   // Stats UI (only when menu is open)
   if (state.statsMenu) {
     const grid = document.getElementById("statsGrid");

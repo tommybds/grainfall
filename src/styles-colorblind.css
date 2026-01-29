@@ -9,6 +9,22 @@ body[data-colorblind="true"] {
   --rgb-hp-dmg: 255, 220, 90; /* yellow */
 }
 
+/* HP label: ensure readable on light HP fill */
+body[data-colorblind="true"] .hpText {
+  color: rgba(0, 0, 0, 0.92);
+  /* Keep same "no badge" look as default mode */
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  /* readable both on light HP fill and dark bar background */
+  text-shadow:
+    0 1px 0 rgba(242,242,242,0.55),
+    0 -1px 0 rgba(242,242,242,0.25),
+    1px 0 0 rgba(242,242,242,0.35),
+    -1px 0 0 rgba(242,242,242,0.35);
+}
+
 /* Avoid green-only emphasis */
 body[data-colorblind="true"] .ghLink--menu {
   border-color: rgba(90, 210, 255, 0.80);

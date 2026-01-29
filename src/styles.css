@@ -102,6 +102,21 @@ body {
   outline: 2px solid rgba(255,255,255,0.35);
   outline-offset: 2px;
 }
+.ghLink--menu {
+  border-color: rgba(35, 134, 54, 0.70);
+  background: rgba(35, 134, 54, 0.20);
+  color: #e6ffed;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(35, 134, 54, 0.18), 0 12px 36px rgba(35, 134, 54, 0.12);
+}
+.ghLink--menu:hover {
+  background: rgba(35, 134, 54, 0.30);
+  border-color: rgba(35, 134, 54, 0.95);
+}
+.ghLink--menu:focus-visible {
+  outline: 2px solid rgba(35, 134, 54, 0.85);
+  outline-offset: 2px;
+}
 
 .stage {
   position: relative;

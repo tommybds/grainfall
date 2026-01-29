@@ -85,6 +85,7 @@ function weaponLabel(id) {
   if (id === "pistol") return "Pistol";
   if (id === "shotgun") return "Shotgun";
   if (id === "lance") return "Lance";
+  if (id === "flame") return "Flamethrower";
   return id;
 }
 

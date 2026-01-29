@@ -113,6 +113,11 @@ export function createAudio() {
       beep({ type: "square", freq: 160, dur: 0.06, gain: 0.06, detune: -20 });
       return;
     }
+    if (kind === "flame") {
+      noise({ dur: 0.03, gain: 0.05 });
+      beep({ type: "sawtooth", freq: 220, dur: 0.05, gain: 0.035, detune: 12 });
+      return;
+    }
     if (kind === "lance") {
       beep({ type: "sawtooth", freq: 220, dur: 0.10, gain: 0.08, detune: -10 });
       return;

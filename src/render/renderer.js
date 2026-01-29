@@ -202,8 +202,8 @@ export function renderFrame(game) {
     const sy = b.y - camera.y;
     const a = Math.atan2(b.vy || 0, b.vx || 0);
     const kind = b.kind || "bullet";
-    const len = kind === "lance" ? 14 : kind === "shotgun" ? 8 : 10; // pistol/bullet
-    const lw = kind === "lance" ? 3 : kind === "shotgun" ? 2.5 : 2;
+    const len = kind === "lance" ? 14 : kind === "shotgun" ? 8 : kind === "flame" ? 6 : 10; // pistol/bullet
+    const lw = kind === "lance" ? 3 : kind === "shotgun" ? 2.5 : kind === "flame" ? 4 : 2;
     const col =
       kind === "pistol"
         ? "rgba(255, 220, 90, 0.95)" // warm yellow
@@ -211,6 +211,8 @@ export function renderFrame(game) {
           ? "rgba(255, 140, 90, 0.95)" // orange
           : kind === "lance"
             ? "rgba(140, 230, 255, 0.95)" // cyan
+            : kind === "flame"
+              ? `rgba(255, ${180 + ((Math.sin((state.t || 0) * 12 + i) * 25) | 0)}, 70, 0.92)` // flicker
             : fgDim;
     ctx.save();
     ctx.translate(sx, sy);

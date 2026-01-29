@@ -16,7 +16,10 @@ function nearestEnemy(enemies, px, py) {
   return best;
 }
 
-function shoot(game, { tx, ty, speed, dmg, spread = 0, pierce = 0, ttl = 1.1, knock = 0, bleedDps = 0, bleedT = 0, kind }) {
+function shoot(
+  game,
+  { tx, ty, speed, dmg, spread = 0, pierce = 0, ttl = 1.1, r = 3, knock = 0, bleedDps = 0, bleedT = 0, kind },
+) {
   if (game.bullets.length >= CFG.maxBullets) return;
   const dir = norm(tx - game.player.x, ty - game.player.y);
   const a = spread ? (Math.random() - 0.5) * spread : 0;
@@ -32,6 +35,7 @@ function shoot(game, { tx, ty, speed, dmg, spread = 0, pierce = 0, ttl = 1.1, kn
       vy: ry * speed,
       dmg,
       ttl,
+      r,
       pierce,
       knock,
       bleedDps,
@@ -45,6 +49,7 @@ export function weaponName(id) {
   if (id === "pistol") return "Pistol";
   if (id === "shotgun") return "Shotgun";
   if (id === "lance") return "Lance";
+  if (id === "flame") return "Flamethrower";
   return id;
 }
 
@@ -118,6 +123,37 @@ export function updateWeapons(dt, game) {
       const pierce = 2 + Math.floor((w.lvl - 1) / 2);
       const ttl = 1.2 + w.lvl * 0.03;
       shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.06, pierce, ttl, bleedDps: 6 + w.lvl * 2, bleedT: 1.6, kind: "lance" });
+      w.cd = 1 / rate;
+      continue;
+    }
+
+    if (w.id === "flame") {
+      // Short-range cone with burn DOT.
+      const rate = (10.0 + w.lvl * 1.25) * player.buffs.fireRateMul;
+      const dmg = (4.0 + w.lvl * 1.1) * player.buffs.dmgMul;
+      const speed = 270;
+      const ttl = 0.26 + w.lvl * 0.01;
+      const spread = 1.05; // wide cone
+      const puffs = 2 + Math.floor(w.lvl / 2); // more density with levels
+      const pierce = w.lvl >= 4 ? 1 : 0;
+      const burnDps = 5 + w.lvl * 1.6;
+      const burnT = 1.2 + w.lvl * 0.08;
+      game.audio?.shoot?.("flame");
+      for (let p = 0; p < puffs; p++) {
+        shoot(game, {
+          tx: target.x,
+          ty: target.y,
+          speed,
+          dmg,
+          spread,
+          ttl,
+          r: 8,
+          pierce,
+          bleedDps: burnDps,
+          bleedT: burnT,
+          kind: "flame",
+        });
+      }
       w.cd = 1 / rate;
       continue;
     }

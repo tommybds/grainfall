@@ -15,7 +15,7 @@ export function generateUpgradeChoices(game) {
 
   // Always include at least one weapon-related choice.
   {
-    const options = ["pistol", "shotgun", "lance"];
+    const options = ["pistol", "shotgun", "lance", "flame"];
     const owned = options.filter((id) => player.weapons.some((w) => w.id === id));
     const missing = options.filter((id) => !player.weapons.some((w) => w.id === id));
     const roll = Math.random();

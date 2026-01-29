@@ -72,6 +72,7 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 - **Pistol**: cadence élevée, gagne des tirs supplémentaires à certains niveaux.
 - **Shotgun**: multi-projectiles + knockback.
 - **Lance**: tir puissant, **perce** + applique un petit saignement.
+- **Flamethrower**: portée courte en cône, applique une brûlure (DOT).
 
 ### Upgrades (choix à chaque level up)
 

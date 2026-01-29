@@ -165,7 +165,8 @@ export function updateBullets(dt, game) {
     }
 
     // Walls: mostly destroy, sometimes ricochet.
-    const ricochetChance = clamp(0.32 + (game.player?.buffs?.ricochetChanceAdd || 0), 0, 0.82);
+    const baseRicochetChance = clamp(0.32 + (game.player?.buffs?.ricochetChanceAdd || 0), 0, 0.82);
+    const ricochetChance = b.kind === "flame" ? 0 : baseRicochetChance;
     const wallRes = bounceOrDestroyBullet({
       bullet: b,
       prevX,

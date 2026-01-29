@@ -3,6 +3,18 @@ import { MAPS } from "./game/maps.js";
 import { DIFFICULTIES } from "./game/difficulty.js";
 import { HEROES } from "./game/heroes.js";
 
+const APP_VERSION = (() => {
+  try {
+    // Replaced at build time (esbuild define). In dev (served from src/), fallback to "dev".
+    return __APP_VERSION__;
+  } catch (_e) {
+    return "dev";
+  }
+})();
+
+const appVersionEl = document.getElementById("appVersion");
+if (appVersionEl) appVersionEl.textContent = `v${APP_VERSION}`;
+
 /** @type {HTMLCanvasElement} */
 const canvas = document.getElementById("game");
 /** @type {CanvasRenderingContext2D} */
@@ -25,7 +37,7 @@ window.addEventListener("keydown", unlockOnce, { passive: true, once: true });
 window.addEventListener("touchstart", unlockOnce, { passive: true, once: true });
 
 // --- Menu wiring (map + difficulty + hero) ---
-function wireGroup({ selector, datasetKey, applyToGame, keys }) {
+function wireGroup({ selector, datasetKey, applyToGame, keys, enabledWhen }) {
   const btns = Array.from(document.querySelectorAll(selector));
   let idx = 0;
   const initialIdx = Math.max(
@@ -55,6 +67,7 @@ function wireGroup({ selector, datasetKey, applyToGame, keys }) {
   window.addEventListener(
     "keydown",
     (e) => {
+      if (enabledWhen && !enabledWhen()) return;
       const i = keys?.[e.key];
       if (i === undefined) return;
       applyByIndex(i);
@@ -97,6 +110,7 @@ const diffGroup = wireGroup({
   datasetKey: "diff",
   applyToGame: (id) => (game.selectedDifficultyId = id),
   keys: { "4": 0, "5": 1, "6": 2 },
+  enabledWhen: () => !game.state.running,
 });
 
 const mapGroup = wireGroup({
@@ -115,6 +129,7 @@ const mapGroup = wireGroup({
     }
   },
   keys: { "1": 0, "2": 1, "3": 2 },
+  enabledWhen: () => !game.state.running,
 });
 
 const heroGroup = wireGroup({
@@ -125,7 +140,29 @@ const heroGroup = wireGroup({
     updateHeroCard(id);
   },
   keys: { "7": 0, "8": 1, "9": 2 },
+  enabledWhen: () => !game.state.running,
 });
+
+// Upgrade menu (level-up choices)
+const btnUp0 = document.getElementById("btnUp0");
+const btnUp1 = document.getElementById("btnUp1");
+const btnUp2 = document.getElementById("btnUp2");
+btnUp0?.addEventListener("click", () => game.chooseUpgrade?.(0));
+btnUp1?.addEventListener("click", () => game.chooseUpgrade?.(1));
+btnUp2?.addEventListener("click", () => game.chooseUpgrade?.(2));
+
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (!game.state?.upgradeMenu) return;
+    if (e.key === "1") game.chooseUpgrade?.(0);
+    else if (e.key === "2") game.chooseUpgrade?.(1);
+    else if (e.key === "3") game.chooseUpgrade?.(2);
+    else return;
+    e.preventDefault();
+  },
+  { passive: false },
+);
 
 // --- Pause/End menu buttons (touch-friendly) ---
 const btnStart = document.getElementById("btnStart");

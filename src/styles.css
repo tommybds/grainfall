@@ -203,6 +203,17 @@ body {
   background: rgba(255,255,255,0.06);
 }
 
+.upgradeGrid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.upgradeBtn {
+  text-align: left;
+  white-space: normal;
+}
+
 .heroCard {
   margin-top: 10px;
   border: 1px solid rgba(255,255,255,0.10);
@@ -258,6 +269,7 @@ body {
   font-size: 11px;
   letter-spacing: 0.10em;
 }
+.footer .version { letter-spacing: 0.10em; }
 code { color: var(--fg); }
 
 /* --- Mobile: prevent horizontal overflow that shifts layout (iOS/Chrome) --- */

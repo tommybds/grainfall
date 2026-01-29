@@ -7,6 +7,8 @@ const fs = require("fs");
 const path = require("path");
 const { Transform } = require("stream");
 
+const pkg = require("./package.json");
+
 const paths = {
   src: "src",
   dist: "dist",
@@ -36,6 +38,7 @@ function bundleJs() {
     outfile: `${paths.dist}/assets/bundle.js`,
     define: {
       "process.env.NODE_ENV": '"production"',
+      __APP_VERSION__: JSON.stringify(pkg.version),
     },
   });
 }

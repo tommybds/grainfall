@@ -5,6 +5,24 @@ import { sampleTile } from "../game/world.js";
 import { ACHIEVEMENT_DEFS, formatTimeMMSS } from "../game/stats.js";
 import { weaponName, WEAPON_MAX_LEVEL } from "../game/weapons.js";
 
+function readRgbVars(state) {
+  const key = state.colorblind ? "cb1" : "cb0";
+  if (state._rgbKey === key && state._rgbVars) return state._rgbVars;
+  const cs = getComputedStyle(document.body);
+  const get = (name, fallback) => (cs.getPropertyValue(name).trim() || fallback);
+  const vars = {
+    heal: get("--rgb-heal", "60, 255, 160"),
+    xp: get("--rgb-xp", "90, 210, 255"),
+    chest: get("--rgb-chest", "255, 210, 90"),
+    buff: get("--rgb-buff", "210, 120, 255"),
+    hpHeal: get("--rgb-hp-heal", "60, 255, 160"),
+    hpDmg: get("--rgb-hp-dmg", "255, 90, 90"),
+  };
+  state._rgbKey = key;
+  state._rgbVars = vars;
+  return vars;
+}
+
 function rgba(hex, a) {
   // hex like #rrggbb
   const r = parseInt(hex.slice(1, 3), 16);
@@ -154,6 +172,7 @@ export function renderFrame(game) {
   // pickups
   ctx.shadowBlur = 0;
   ctx.fillStyle = rgba(theme.fg || CFG.fg, 0.92);
+  const rgb = readRgbVars(state);
   for (let i = 0; i < pickups.length; i++) {
     const p = pickups[i];
     const sx = p.x - camera.x;
@@ -168,14 +187,15 @@ export function renderFrame(game) {
     const a = 0.65 + 0.35 * pulse;
 
     // Inject a bit of color only for pickups (readability), keep world monochrome.
+    // Palette is read from CSS vars (overridden by styles-colorblind.css when enabled).
     const col =
       p.kind === "heal"
-        ? `rgba(60, 255, 160, ${a})`
+        ? `rgba(${rgb.heal}, ${a})`
         : p.kind === "xp"
-          ? `rgba(90, 210, 255, ${a})`
+          ? `rgba(${rgb.xp}, ${a})`
           : p.kind === "chest"
-            ? `rgba(255, 210, 90, ${a})`
-            : `rgba(210, 120, 255, ${a})`; // buff
+            ? `rgba(${rgb.chest}, ${a})`
+            : `rgba(${rgb.buff}, ${a})`; // buff
 
     // Halo + glyph
     drawSoftDisc(ctx, sx, sy, 14 + pulse * 10, 0.16 * pulse);
@@ -510,10 +530,46 @@ export function renderFrame(game) {
 
   // HUD + overlay text
   const hpPct = Math.round((player.hp / player.hpMax) * 100);
+  const hpBar = document.getElementById("hpBar");
   const hpFill = document.getElementById("hpFill");
   const hpText = document.getElementById("hpText");
-  if (hpFill) hpFill.style.transform = `scaleX(${clamp((player.hp || 0) / (player.hpMax || 1), 0, 1)})`;
+  const hpRatio = clamp((player.hp || 0) / (player.hpMax || 1), 0, 1);
+  if (hpFill) hpFill.style.transform = `scaleX(${hpRatio})`;
   if (hpText) hpText.textContent = `HP ${Math.round(player.hp || 0)}/${Math.round(player.hpMax || 0)}`;
+
+  // HP bar feedback (flash on change)
+  {
+    const now = performance.now();
+    const prevHp = state._hpPrev ?? (player.hp || 0);
+    const curHp = player.hp || 0;
+    if (Math.abs(curHp - prevHp) >= 0.5) {
+      state._hpPrev = curHp;
+      state._hpFlashUntil = now + 280;
+      state._hpFlashDir = curHp > prevHp ? 1 : -1; // +1 heal, -1 damage
+    }
+    const rem = (state._hpFlashUntil || 0) - now;
+    if (hpBar) {
+      if (rem > 0) {
+        const t = clamp(rem / 280, 0, 1);
+        const a = (1 - t) * 0.55;
+        const isHeal = (state._hpFlashDir || 0) > 0;
+        // Palette is read from CSS vars (overridden by styles-colorblind.css when enabled).
+        const col = isHeal ? `rgba(${rgb.hpHeal}, ${a})` : `rgba(${rgb.hpDmg}, ${a})`;
+        hpBar.style.boxShadow = `0 0 0 1px ${col}, 0 0 22px ${col}`;
+      } else {
+        hpBar.style.boxShadow = "";
+      }
+    }
+    if (hpFill) {
+      if (rem > 0) {
+        const t = clamp(rem / 280, 0, 1);
+        const boost = 1 + (1 - t) * 0.35;
+        hpFill.style.filter = `brightness(${boost})`;
+      } else {
+        hpFill.style.filter = "";
+      }
+    }
+  }
   const waveLeft = Math.max(0, CFG.waveSeconds - (state.t % CFG.waveSeconds));
   const wmm = Math.floor(waveLeft / 60);
   const wss = Math.floor(waveLeft % 60);

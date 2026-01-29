@@ -36,6 +36,8 @@
     <meta name="twitter:image" content="https://grainfall.tommy-bordas.fr/grainfall-og.jpg">
     <link rel="icon" href="./favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles-responsive.css">
+    <link rel="stylesheet" href="./styles-colorblind.css">
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-PSHXC31T9X"></script>
@@ -70,6 +72,7 @@
 
       <main class="stage" aria-label="Jeu">
         <canvas id="game" class="canvas" width="960" height="540"></canvas>
+        <pre id="debugOverlay" class="debugOverlay" hidden></pre>
         <div class="overlay" id="overlay" role="dialog" aria-modal="true" data-active="true">
           <div class="panel">
             <div class="title">GRAINFALL (ASCII)</div>
@@ -143,6 +146,14 @@
               <div class="menuBtns menuBtns--single">
                 <button id="btnTutorial" class="menuBtn" type="button">Tutoriel</button>
               </div>
+              <details class="maps optDetails" open>
+                <summary class="mapsTitle optSummary">OPTIONS</summary>
+                <div class="mapList optGrid">
+                  <button id="btnMusicModeStart" class="menuBtn" type="button">ARMES MUSICALES: OFF</button>
+                  <select id="selMusicScoreStart" class="menuBtn menuSelect" aria-label="Partition musicale"></select>
+                  <button id="btnColorblind" class="menuBtn" type="button">Daltonien: OFF</button>
+                </div>
+              </details>
               <div class="rules">
                 <div><span class="k">Déplacement</span> ZQSD/WASD (auto) / Flèches</div>
                 <div><span class="k">Pause</span> P</div>
@@ -175,6 +186,14 @@
                 <button id="btnMenu" class="menuBtn" type="button">Menu</button>
                 <button id="btnStatsPause" class="menuBtn" type="button">Stats</button>
               </div>
+              <details class="maps optDetails" open>
+                <summary class="mapsTitle optSummary">OPTIONS</summary>
+                <div class="mapList optGrid">
+                  <button id="btnMusicModePause" class="menuBtn" type="button">ARMES MUSICALES: OFF</button>
+                  <select id="selMusicScorePause" class="menuBtn menuSelect" aria-label="Partition musicale"></select>
+                  <button id="btnColorblindPause" class="menuBtn" type="button">Daltonien: OFF</button>
+                </div>
+              </details>
               <div class="hint">Astuce: les héros ont des stats différentes (HP/vitesse/range/armes).</div>
               <div class="links">
                 <a
@@ -235,12 +254,12 @@
 
             <div id="upgradeMenu" hidden>
               <div class="mapsTitle">UPGRADE</div>
+              <div class="ownedWeps" id="ownedWeps"></div>
               <div class="upgradeGrid">
                 <button id="btnUp0" class="menuBtn upgradeBtn" type="button">1 — ...</button>
                 <button id="btnUp1" class="menuBtn upgradeBtn" type="button">2 — ...</button>
                 <button id="btnUp2" class="menuBtn upgradeBtn" type="button">3 — ...</button>
               </div>
-              <div class="ownedWeps" id="ownedWeps"></div>
               <div class="hint" id="upgradeHint">Choisis 1–3.</div>
             </div>
           </div>

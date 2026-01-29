@@ -34,9 +34,11 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 - **Progression**: XP → level up → choix d’upgrade (3 options)
 - **Objets**: XP / heal / buff / chest
 - **Dash** (cooldown) + upgrades associés
+- **Son / musique**: toggle **SND/MUTE** (bouton en haut)
 - **Menu** de sélection (carte / difficulté / héros)
 - **High score** persistant sur l’appareil (local)
 - **Stats détaillées + succès** (persistants) + écran dédié
+- **Accessibilité**: option **Daltonien** (anti rouge/vert)
 
 ## Gameplay (mécaniques)
 
@@ -63,6 +65,7 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 ## Héros
 
 - **Runner** (`>`): rapide, fragile — start: `Pistol`
+- **Pyro** (`~`): contrôle de zone — start: `Flamethrower`
 - **Tank** (`#`): très tanky, plus lent — start: `Pistol`
 - **Gunner** (`&`): DPS, démarre armé — start: `Pistol` + `Shotgun`
 
@@ -82,7 +85,7 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 
 ### Upgrades (choix à chaque level up)
 
-- **Armes**: `UNLOCK` / `UP` d’une arme (jusqu’à lvl 7).
+- **Armes**: `UNLOCK` / `UP` d’une arme (jusqu’à lvl 4).
 - **Buffs**: `FIRE +` (cadence), `DMG +` (dégâts), `SPD +` (vitesse).
 - **Perks**: `RICOCHET +`, `HP MAX +`, `MAGNET +`, `DASH +`, `EXÉCUTE`, `CRIT +`, `CRIT BURN`, `BRÛLURE PROPAGE`.
 
@@ -154,9 +157,12 @@ npm run serve:dist
   - Entrée: démarrer
   - P: pause
   - R: recommencer
+  - Son: bouton **SND/MUTE**
   - 1/2/3: carte — 4/5/6: difficulté — 7/8/9: héros
   - Menu d’upgrade: ZQSD/Flèches pour sélectionner, Entrée/Espace pour valider (1/2/3 toujours OK)
   - Stats/Succès: bouton dans le menu (Esc pour revenir)
+  - Tutoriel: bouton dans le menu (Esc pour revenir)
+  - Daltonien: bouton dans le menu (anti rouge/vert)
 - **Mobile (tactile)**
   - drag en bas à gauche **ou** en bas à droite: déplacer (joystick)
   - bouton **PAUSE** en haut: ouvrir le menu pause

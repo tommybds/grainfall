@@ -63,6 +63,9 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       // tutorial overlay
       tutorialMenu: false,
 
+      // accessibility
+      colorblind: false,
+
       // lightweight objective per run
       objective: null,
     },
@@ -383,6 +386,16 @@ function update(dt, game) {
 
   // wave system (spawns + boss)
   updateWaves(dt, game);
+
+  // Drive music intensity (0..1) from progression (wave/time).
+  // Kept lightweight so it won't impact gameplay even if audio is disabled.
+  if (game.audio?.setIntensity) {
+    const wave = Number(s.wave) || 1;
+    const base = Math.max(0, wave - 1) / 14; // ~full intensity around wave 15
+    const tBoost = (Number(s.t) || 0) / 240; // gentle ramp if player stalls
+    const x = Math.max(0, Math.min(1, Math.max(base, tBoost)));
+    game.audio.setIntensity(x);
+  }
 
   // player movement
   const usingAnalog = !!game.input?.joy?.active;

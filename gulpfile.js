@@ -47,6 +47,20 @@ function copyCss() {
   return gulp.src([`${paths.src}/styles.css`]).pipe(plumber()).pipe(gulp.dest(paths.dist));
 }
 
+async function buildCssProd() {
+  // Concat + minify CSS for production (single dist/styles.css)
+  const css =
+    fs.readFileSync(path.join(paths.src, "styles.css"), "utf8") +
+    "\n" +
+    fs.readFileSync(path.join(paths.src, "styles-responsive.css"), "utf8") +
+    "\n" +
+    fs.readFileSync(path.join(paths.src, "styles-colorblind.css"), "utf8");
+
+  const res = await esbuild.transform(css, { loader: "css", minify: true });
+  await fs.promises.mkdir(paths.dist, { recursive: true });
+  await fs.promises.writeFile(path.join(paths.dist, "styles.css"), res.code, "utf8");
+}
+
 function copyHtmlProd() {
   const replace = new Transform({
     objectMode: true,
@@ -58,8 +72,11 @@ function copyHtmlProd() {
           `<script src="./assets/bundle.js?v=${pkg.version}" defer></script>`,
         );
 
-        // Cache-bust main stylesheet in prod
+        // Cache-bust main stylesheet in prod (single file)
         out = out.replace(/href="\.\/styles\.css"/g, `href="./styles.css?v=${pkg.version}"`);
+        // Remove additional CSS links (they are merged into dist/styles.css)
+        out = out.replace(/\s*<link\s+rel="stylesheet"\s+href="\.\/styles-responsive\.css"\s*>\s*\n?/g, "");
+        out = out.replace(/\s*<link\s+rel="stylesheet"\s+href="\.\/styles-colorblind\.css"\s*>\s*\n?/g, "");
 
         // Inject version from package.json into the HTML (so it's visible even before JS runs)
         const v = `v${pkg.version}`;
@@ -105,6 +122,8 @@ function copyOther() {
       `!${paths.src}/main.js`,
       `!${paths.src}/index.html`,
       `!${paths.src}/styles.css`,
+      `!${paths.src}/styles-responsive.css`,
+      `!${paths.src}/styles-colorblind.css`,
     ])
     .pipe(plumber())
     .pipe(gulp.dest(paths.dist));
@@ -161,7 +180,7 @@ function watchSrc() {
   });
 }
 
-const build = gulp.series(clean, gulp.parallel(copyHtmlProd, copyCss, copyOther, bundleJs), pruneEmptyDist);
+const build = gulp.series(clean, gulp.parallel(copyHtmlProd, buildCssProd, copyOther, bundleJs), pruneEmptyDist);
 const dev = gulp.series(serveSrc, watchSrc);
 
 exports.clean = clean;

@@ -2,6 +2,8 @@ import { createGame, runGameLoop } from "./game/game.js";
 import { MAPS } from "./game/maps.js";
 import { DIFFICULTIES } from "./game/difficulty.js";
 import { HEROES } from "./game/heroes.js";
+import { loadSignedLocal, saveSignedLocal } from "./game/storage.js";
+import { MUSIC_SCORES, MUSIC_SCORE_IDS } from "./audio/musicScores.js";
 
 const APP_VERSION = (() => {
   try {
@@ -28,11 +30,156 @@ const game = createGame({ canvas, ctx, hudEl, overlayEl });
 game.goToMenu();
 runGameLoop(game);
 
+// --- Accessibility settings ---
+const btnColorblind = document.getElementById("btnColorblind");
+const btnColorblindPause = document.getElementById("btnColorblindPause");
+
+function applyColorblind(enabled) {
+  game.state.colorblind = !!enabled;
+  document.body.dataset.colorblind = enabled ? "true" : "false";
+  localStorage.setItem("sv_colorblind", enabled ? "1" : "0");
+  const label = `Daltonien: ${enabled ? "ON" : "OFF"}`;
+  if (btnColorblind) btnColorblind.textContent = label;
+  if (btnColorblindPause) btnColorblindPause.textContent = label;
+}
+
+try {
+  applyColorblind(localStorage.getItem("sv_colorblind") === "1");
+} catch {
+  // ignore
+}
+
+btnColorblind?.addEventListener("click", () => applyColorblind(!game.state.colorblind));
+btnColorblindPause?.addEventListener("click", () => applyColorblind(!game.state.colorblind));
+
+// --- Audio settings (signed localStorage) ---
+const SETTINGS_KEY = "settings_v1";
+const DEFAULT_SETTINGS = {
+  muted: false,
+  musicMode: false,
+  // "random" means: pick a random score at run start / when enabling music.
+  musicScoreChoice: "random",
+  // last actually selected score id (used when choice is random)
+  musicScoreId: MUSIC_SCORE_IDS[0] || "a_minor_chill",
+};
+
+/** @type {{muted:boolean, musicMode:boolean, musicScoreChoice:string, musicScoreId:string}} */
+let settings = { ...DEFAULT_SETTINGS };
+
+function scoreLabel(id) {
+  return (MUSIC_SCORES[id] && MUSIC_SCORES[id].name) || id || "?";
+}
+
+function applySettingsToAudio() {
+  game.audio?.setMuted?.(!!settings.muted);
+  game.audio?.setMode?.(settings.musicMode ? "music" : "sfx");
+  // Apply current/last score immediately (random picks are handled on enable/start).
+  if (settings.musicScoreId) game.audio?.setScore?.(settings.musicScoreId);
+}
+
+function updateMusicButtons() {
+  const onOff = settings.musicMode ? "ON" : "OFF";
+  const tMode = `ARMES MUSICALES: ${onOff}`;
+  document.getElementById("btnMusicModeStart")?.replaceChildren(document.createTextNode(tMode));
+  document.getElementById("btnMusicModePause")?.replaceChildren(document.createTextNode(tMode));
+}
+
+function pickRandomScore(exclude) {
+  const ids = MUSIC_SCORE_IDS;
+  if (!ids || !ids.length) return null;
+  const pool = ids.length > 1 ? ids.filter((id) => id !== exclude) : ids;
+  return pool[(Math.random() * pool.length) | 0] || ids[0];
+}
+
+function ensureMusicScoreSelectOptions() {
+  const sels = [document.getElementById("selMusicScoreStart"), document.getElementById("selMusicScorePause")].filter(Boolean);
+  if (!sels.length) return;
+  for (const sel of sels) {
+    // Build options only once.
+    if (sel.dataset?.built === "1") continue;
+    sel.replaceChildren();
+    const optRnd = document.createElement("option");
+    optRnd.value = "random";
+    optRnd.textContent = "Aléatoire (au démarrage)";
+    sel.appendChild(optRnd);
+    for (const id of MUSIC_SCORE_IDS) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = scoreLabel(id);
+      sel.appendChild(opt);
+    }
+    sel.dataset.built = "1";
+  }
+}
+
+function syncMusicScoreSelects() {
+  const v = settings.musicScoreChoice || "random";
+  const sels = [document.getElementById("selMusicScoreStart"), document.getElementById("selMusicScorePause")].filter(Boolean);
+  for (const sel of sels) sel.value = v;
+}
+
+function applyMusicChoiceOnEnableOrStart() {
+  if (!settings.musicMode) return;
+  const choice = settings.musicScoreChoice || "random";
+  if (choice === "random") {
+    const pick = pickRandomScore(settings.musicScoreId);
+    if (pick) {
+      settings.musicScoreId = pick;
+      game.audio?.setScore?.(pick);
+      persistSettings();
+    }
+    return;
+  }
+  if (MUSIC_SCORES[choice]) {
+    settings.musicScoreId = choice;
+    game.audio?.setScore?.(choice);
+    persistSettings();
+  }
+}
+
+function persistSettings() {
+  try {
+    saveSignedLocal(SETTINGS_KEY, settings);
+  } catch {
+    // ignore
+  }
+}
+
+loadSignedLocal(SETTINGS_KEY, DEFAULT_SETTINGS).then((st) => {
+  settings = { ...DEFAULT_SETTINGS, ...(st || {}) };
+  // Migration: legacy boolean musicRandom -> musicScoreChoice
+  if (!settings.musicScoreChoice) {
+    settings.musicScoreChoice = (st && st.musicRandom) ? "random" : (settings.musicScoreId || "random");
+  }
+  if (settings.musicScoreChoice !== "random" && !MUSIC_SCORES[settings.musicScoreChoice]) {
+    settings.musicScoreChoice = "random";
+  }
+  if (!MUSIC_SCORES[settings.musicScoreId]) settings.musicScoreId = DEFAULT_SETTINGS.musicScoreId;
+  applySettingsToAudio();
+  ensureMusicScoreSelectOptions();
+  syncMusicScoreSelects();
+  updateMusicButtons();
+  const btnSoundTop = document.getElementById("btnSoundTop");
+  if (btnSoundTop) btnSoundTop.textContent = settings.muted ? "SND" : "MUTE";
+});
+
+// If random is enabled, pick a new score at each run start.
+// We wrap start here so it also works for keyboard/touch start.
+{
+  const origStart = game.start?.bind(game);
+  if (origStart) {
+    game.start = () => {
+      applyMusicChoiceOnEnableOrStart();
+      origStart();
+    };
+  }
+}
+
 // Unlock audio on first user gesture (required on mobile)
 const unlockOnce = () => {
   game.audio?.unlock?.();
   // start unmuted after first gesture (user can toggle)
-  game.audio?.setMuted?.(false);
+  game.audio?.setMuted?.(!!settings.muted);
 };
 window.addEventListener("pointerdown", unlockOnce, { passive: true, once: true });
 window.addEventListener("keydown", unlockOnce, { passive: true, once: true });
@@ -305,10 +452,98 @@ btnSoundTop?.addEventListener("click", () => {
   const next = !game.audio?.muted;
   game.audio?.setMuted?.(next);
   btnSoundTop.textContent = next ? "SND" : "MUTE";
+  settings.muted = !!next;
+  persistSettings();
 });
 
 const btnDashTop = document.getElementById("btnDashTop");
 btnDashTop?.addEventListener("click", () => game.requestDash?.());
+
+// --- Musical weapons option ---
+function toggleMusicMode() {
+  game.audio?.unlock?.();
+  const next = !settings.musicMode;
+  settings.musicMode = next;
+  // When enabling, apply the current choice (random will pick now).
+  if (next) applyMusicChoiceOnEnableOrStart();
+  game.audio?.setMode?.(next ? "music" : "sfx");
+  updateMusicButtons();
+  persistSettings();
+}
+
+document.getElementById("btnMusicModeStart")?.addEventListener("click", toggleMusicMode);
+document.getElementById("btnMusicModePause")?.addEventListener("click", toggleMusicMode);
+updateMusicButtons();
+
+// Music score dropdown (default: random)
+ensureMusicScoreSelectOptions();
+syncMusicScoreSelects();
+document.getElementById("selMusicScoreStart")?.addEventListener("change", (e) => {
+  const v = e?.target?.value || "random";
+  settings.musicScoreChoice = v;
+  syncMusicScoreSelects();
+  // If user explicitly picks a concrete score while music is on, apply immediately.
+  if (v !== "random" && MUSIC_SCORES[v]) {
+    settings.musicScoreId = v;
+    game.audio?.setScore?.(v);
+  }
+  persistSettings();
+});
+document.getElementById("selMusicScorePause")?.addEventListener("change", (e) => {
+  const v = e?.target?.value || "random";
+  settings.musicScoreChoice = v;
+  syncMusicScoreSelects();
+  if (v !== "random" && MUSIC_SCORES[v]) {
+    settings.musicScoreId = v;
+    game.audio?.setScore?.(v);
+  }
+  persistSettings();
+});
+
+// --- Debug overlay (toggle with `) ---
+{
+  const debugEl = document.getElementById("debugOverlay");
+  let on = false;
+  function renderDebug() {
+    if (!on || !debugEl) return;
+    const a = game.audio?.getDebugInfo?.() || {};
+    const s = game.state || {};
+    const p = game.player || {};
+    const weps = (p.weapons || []).map((w) => `${w.id}:${w.lvl || 1}`).join("  ") || "-";
+    const choice = settings.musicScoreChoice || "random";
+    const chosen = a.scoreId ? scoreLabel(a.scoreId) : "-";
+    const layers = a.layers ? `${a.layers.count} (pad:${a.layers.pad ? "1" : "0"} bass:${a.layers.bass ? "1" : "0"} hat:${a.layers.hat ? "1" : "0"})` : "-";
+    debugEl.textContent =
+      [
+        `DEBUG  (toggle: \`)`,
+        ``,
+        `run: ${s.running ? "on" : "off"}   paused: ${s.paused ? "yes" : "no"}   t: ${(s.t || 0).toFixed(1)}s`,
+        `wave: ${s.wave || 1}   kills: ${s.kills || 0}   enemies: ${(game.enemies && game.enemies.length) || 0}`,
+        `bullets: ${(game.bullets && game.bullets.length) || 0}   enemyBullets: ${(game.enemyBullets && game.enemyBullets.length) || 0}`,
+        ``,
+        `audio: mode=${a.mode || "-"}   muted=${game.audio?.muted ? "yes" : "no"}`,
+        `music: choice=${choice}   playing=${chosen}`,
+        `intensity: ${typeof a.intensity === "number" ? a.intensity.toFixed(2) : "-" }   layers: ${layers}`,
+        ``,
+        `weapons: ${weps}`,
+      ].join("\n");
+  }
+  if (debugEl) {
+    setInterval(renderDebug, 140);
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.code === "Backquote") {
+          on = !on;
+          debugEl.hidden = !on;
+          if (on) renderDebug();
+          e.preventDefault();
+        }
+      },
+      { passive: false },
+    );
+  }
+}
 
 // Note: initial selection is taken from aria-selected="true" in the HTML buttons.
 updateHeroCard(game.selectedHeroId);

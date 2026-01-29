@@ -1,0 +1,33 @@
+/* Colorblind overrides (loaded separately) */
+
+body[data-colorblind="true"] {
+  /* Make HP rely primarily on size, not color */
+  --hp-fill: rgba(242, 242, 242, 0.88);
+  /* Anti red/green palette for canvas */
+  --rgb-heal: 90, 210, 255; /* cyan */
+  --rgb-hp-heal: 90, 210, 255; /* cyan */
+  --rgb-hp-dmg: 255, 220, 90; /* yellow */
+}
+
+/* Avoid green-only emphasis */
+body[data-colorblind="true"] .ghLink--menu {
+  border-color: rgba(90, 210, 255, 0.80);
+  background: rgba(90, 210, 255, 0.16);
+  color: #eaf9ff;
+  box-shadow: 0 0 0 1px rgba(90, 210, 255, 0.14), 0 12px 36px rgba(90, 210, 255, 0.10);
+}
+body[data-colorblind="true"] .ghLink--menu:hover {
+  background: rgba(90, 210, 255, 0.24);
+  border-color: rgba(90, 210, 255, 0.95);
+}
+body[data-colorblind="true"] .ghLink--menu:focus-visible {
+  outline: 2px solid rgba(90, 210, 255, 0.85);
+  outline-offset: 2px;
+}
+
+/* Achievements: avoid green-only success */
+body[data-colorblind="true"] .achItem[data-unlocked="true"] {
+  border-color: rgba(90, 210, 255, 0.75);
+  background: rgba(90, 210, 255, 0.10);
+}
+

@@ -1,0 +1,121 @@
+/* Responsive rules extracted from styles.css */
+
+/* --- Desktop: compact 2-column menu when height is tight --- */
+@media (min-width: 720px) and (max-height: 820px) {
+  #startMenu {
+    column-count: 2;
+    column-gap: 14px;
+  }
+  #startMenu > * {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+  }
+  /* Slightly tighter spacing so everything fits */
+  .maps { margin-bottom: 10px; }
+  .mapList { gap: 5px; }
+  :is(.mapBtn, .diffBtn, .heroBtn) { padding: 9px 10px; }
+  .heroCard { margin-top: 8px; }
+  .menuBtns--single { margin-bottom: 8px; }
+  .hint { margin-top: 10px; }
+}
+
+/* --- Mobile: prevent horizontal overflow that shifts layout (iOS/Chrome) --- */
+@media (max-width: 560px) {
+  .topbar {
+    /* Switch to a compact 2-row layout */
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  /* Allow flex children to actually shrink (prevents page from becoming wider than viewport) */
+  .brand,
+  .hudWrap,
+  .hud {
+    min-width: 0;
+  }
+
+  /* Put HUD + buttons on their own row */
+  .hudWrap {
+    width: 100%;
+    justify-content: initial;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto;
+    align-items: start;
+    gap: 8px;
+  }
+  /* Row 1: HUD + HP bar (full width). Row 2: 3 buttons aligned. */
+  .hudCol { grid-column: 1 / -1; justify-items: start; }
+  #btnSoundTop { grid-row: 2; grid-column: 1; }
+  #btnPauseTop { grid-row: 2; grid-column: 2; }
+  #btnDashTop { grid-row: 2; grid-column: 3; }
+  .hpBar { width: 100%; }
+  .pauseBtn { width: 100%; text-align: center; }
+
+  /* Compact typography in topbar */
+  .logo { font-size: 12px; letter-spacing: 0.22em; }
+  .sub { font-size: 11px; }
+  .pauseBtn { padding: 6px 8px; font-size: 11px; }
+
+  /* HUD: single line, horizontally scrollable (compact + no layout shift) */
+  .hud {
+    font-size: 11px;
+    gap: 10px;
+    white-space: nowrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+  }
+  .hud::-webkit-scrollbar { display: none; } /* WebKit */
+
+  /* HUD: keep the most useful stats on mobile */
+  .hud > span:nth-child(3),
+  .hud > span:nth-child(4),
+  .hud > span:nth-child(8) {
+    display: none;
+  }
+
+  /* Menu panel: make it less tall on mobile */
+  .panel {
+    padding: 12px 12px 10px;
+    width: min(560px, calc(100vw - 24px));
+    max-height: calc(100vh - 120px);
+    overflow: auto;
+  }
+  .title { font-size: 13px; margin-bottom: 8px; }
+  .maps { margin-bottom: 8px; }
+  .mapsTitle { font-size: 10px; margin-bottom: 4px; }
+  .mapList {
+    gap: 5px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .mapBtn,
+  .diffBtn,
+  .heroBtn,
+  .menuBtn {
+    font-size: 12px;
+    padding: 8px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .menuBtns { margin-top: 8px; gap: 6px; }
+  .heroCard { margin-top: 8px; padding: 8px 8px; }
+  .heroGlyph { font-size: 16px; }
+  /* Hero card is tall; keep only the header on small screens */
+  .heroStats { display: none; }
+
+  /* Hide dev footer to free vertical space */
+  .footer { display: none; }
+
+  /* Optional: rules are verbose on small screens */
+  .rules { display: none; }
+  .hint { margin-top: 8px; font-size: 11px; }
+}
+

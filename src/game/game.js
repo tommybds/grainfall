@@ -7,7 +7,7 @@ import { createPlayer, createEnemy } from "./entities.js";
 import { updateWaves, spawnEnemyAtEdge } from "./waves.js";
 import { updateWeapons } from "./weapons.js";
 import { updateEnemies, updateBullets, updateEnemyBullets } from "./combat.js";
-import { applyPickup } from "./pickups.js";
+import { applyPickup, applyUpgradeChoice, generateUpgradeChoices } from "./pickups.js";
 import { renderFrame } from "../render/renderer.js";
 import { len2 } from "../core/math.js";
 import { mapById } from "./maps.js";
@@ -49,6 +49,14 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       wallBumpT: 0,
       wallBumpX: 0,
       wallBumpY: 0,
+
+      // upgrade menu (level-up choices)
+      upgradeMenu: false,
+      upgradeRemaining: 0,
+      upgradeChoices: [],
+
+      // lightweight objective per run
+      objective: null,
     },
 
     player: createPlayer(heroById("runner")),
@@ -78,6 +86,8 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     setPaused,
     togglePause,
     spawnEnemyNear,
+    openUpgradeMenu,
+    chooseUpgrade,
   };
 
   // Slight zoom-out on small screens so you see more of the world.
@@ -114,6 +124,12 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.wallBumpX = 0;
     game.state.wallBumpY = 0;
 
+    game.state.upgradeMenu = false;
+    game.state.upgradeRemaining = 0;
+    game.state.upgradeChoices = [];
+
+    game.state.objective = createObjective();
+
     game.state.diff = difficultyById(game.selectedDifficultyId);
     game.player = createPlayer(heroById(game.selectedHeroId));
     game.enemies.length = 0;
@@ -145,6 +161,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
 
   function setPaused(paused) {
     if (!game.state.running || game.state.gameOver) return;
+    if (game.state.upgradeMenu) return;
     game.state.paused = !!paused;
     game.overlayEl.style.opacity = game.state.paused ? "1" : "0";
     game.overlayEl.dataset.active = game.state.paused ? "true" : "false";
@@ -169,6 +186,40 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
   function togglePause() {
     if (game.state.gameOver) return;
     setPaused(!game.state.paused);
+  }
+
+  function openUpgradeMenu(count = 1) {
+    if (!count || count <= 0) return;
+    game.state.upgradeMenu = true;
+    game.state.upgradeRemaining = Math.max(1, (game.state.upgradeRemaining || 0) + count);
+    game.state.upgradeChoices = generateUpgradeChoices(game);
+    // freeze gameplay but keep overlay interaction
+    game.state.paused = true;
+    game.overlayEl.style.opacity = "1";
+    game.overlayEl.dataset.active = "true";
+  }
+
+  function chooseUpgrade(index) {
+    if (!game.state.upgradeMenu) return;
+    const c = game.state.upgradeChoices?.[index];
+    applyUpgradeChoice(game, c);
+    game.state.upgradeRemaining = Math.max(0, (game.state.upgradeRemaining || 1) - 1);
+    if (game.state.upgradeRemaining > 0) {
+      game.state.upgradeChoices = generateUpgradeChoices(game);
+      return;
+    }
+    game.state.upgradeMenu = false;
+    game.state.upgradeChoices = [];
+    game.state.paused = false;
+    game.overlayEl.style.opacity = "0";
+    game.overlayEl.dataset.active = "false";
+  }
+
+  function createObjective() {
+    const roll = Math.random();
+    if (roll < 0.34) return { type: "kills", label: "KILL", target: 50, progress: 0, done: false };
+    if (roll < 0.67) return { type: "time", label: "SURVIVE", target: 60, progress: 0, done: false };
+    return { type: "pickups", label: "PICK", target: 8, progress: 0, done: false };
   }
 
   function spawnEnemyNear(x, y, kind) {
@@ -205,7 +256,7 @@ export function runGameLoop(game) {
     resizeCanvasToViewport(game.canvas, game.ctx, game.viewport);
 
     const now = performance.now();
-    const dt = dtFromMs(now, game.state.lastMs);
+    let dt = dtFromMs(now, game.state.lastMs);
     game.state.lastMs = now;
 
     if (game.state.hitFlash > 0) game.state.hitFlash = Math.max(0, game.state.hitFlash - dt);
@@ -328,6 +379,22 @@ function update(dt, game) {
     if (len2(p.x - game.player.x, p.y - game.player.y) <= rr * rr) {
       applyPickup(game, p);
       game.pickups.splice(i, 1);
+      // objective tracking
+      if (s.objective && !s.objective.done && s.objective.type === "pickups") {
+        s.objective.progress += 1;
+      }
+    }
+  }
+
+  // objective tracking (kills/time) + reward
+  if (s.objective && !s.objective.done) {
+    if (s.objective.type === "kills") s.objective.progress = s.kills || 0;
+    if (s.objective.type === "time") s.objective.progress = Math.floor(s.t || 0);
+    if (s.objective.progress >= s.objective.target) {
+      s.objective.done = true;
+      // Reward: drop a chest near the player
+      game.pickups.push({ x: game.player.x + 18, y: game.player.y - 18, kind: "chest", value: 1, ttl: 16 });
+      game.floats.push({ x: game.player.x, y: game.player.y - 30, ttl: 1.4, text: "OBJECTIVE +" });
     }
   }
 

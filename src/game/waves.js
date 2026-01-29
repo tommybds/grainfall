@@ -58,12 +58,27 @@ export function updateWaves(dt, game) {
     s.waveJustStarted = false;
   }
 
+  // Boss telegraph
+  const waveIn = s.t % CFG.waveSeconds;
+  const waveLeft = Math.max(0, CFG.waveSeconds - waveIn);
+  const nextBossWave = s.wave + (CFG.bossEvery - (s.wave % CFG.bossEvery || CFG.bossEvery));
+  s.nextBossWave = nextBossWave;
+  s.nextBossIn = (nextBossWave - s.wave) * CFG.waveSeconds + waveLeft;
+  // one-time warning when boss is close
+  if (s.nextBossIn <= 3.2 && !s.bossAlive) {
+    if (s._bossWarnWave !== s.wave) {
+      s._bossWarnWave = s.wave;
+      game.floats.push({ x: game.player.x, y: game.player.y - 30, ttl: 1.4, text: "BOSS INCOMING" });
+    }
+  }
+
   // base difficulty ramp
   s.difficulty = 1 + s.wave * 0.16;
 
   // boss trigger (once per boss wave)
   if (isBossWave(s.wave) && !s.bossAlive && s.bossWave !== s.wave) {
     spawnBoss(game);
+    game.floats.push({ x: game.player.x, y: game.player.y - 34, ttl: 1.6, text: "BOSS" });
   }
 
   // spawn pacing: slightly calmer during boss

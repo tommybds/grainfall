@@ -200,14 +200,18 @@ export function renderFrame(game) {
     const b = bullets[i];
     const sx = b.x - camera.x;
     const sy = b.y - camera.y;
+    const a = Math.atan2(b.vy || 0, b.vx || 0);
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(a);
     ctx.globalAlpha = 0.78;
     ctx.beginPath();
-    ctx.moveTo(sx - 6, sy);
-    ctx.lineTo(sx + 6, sy);
+    ctx.moveTo(-6, 0);
+    ctx.lineTo(6, 0);
     ctx.strokeStyle = fgDim;
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   // enemy bullets (dots)
@@ -238,6 +242,18 @@ export function renderFrame(game) {
     else if (e.kind === "spitter") ch = "%";
     else if (e.isBoss) ch = "@";
     drawEntityChar(ctx, sx, sy, ch, e.isBoss ? 1 : 0.95);
+
+    // Telegraphed spitter shot (small "!" above)
+    if (e.kind === "spitter" && (e.windT || 0) > 0) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      const t = clamp((e.windT || 0) / 0.28, 0, 1);
+      ctx.globalAlpha = 0.35 + 0.55 * (1 - t);
+      ctx.fillStyle = "rgba(255,160,90,0.95)";
+      ctx.font = `18px ${CFG.fontFamily}`;
+      drawEntityChar(ctx, sx, sy - 18, "!", 1);
+      ctx.restore();
+    }
 
     // hp bar above elites/boss
     const elite = e.isBoss || e.kind === "tank" || e.kind === "spitter";
@@ -389,6 +405,16 @@ export function renderFrame(game) {
   const wmm = Math.floor(waveLeft / 60);
   const wss = Math.floor(waveLeft % 60);
   const waveLeftStr = `${wmm}:${String(wss).padStart(2, "0")}`;
+  const extra = [];
+  if (state.nextBossIn !== undefined && state.nextBossIn <= 12 && !state.bossAlive) {
+    extra.push(`<span>BOSS <span class="v">${Math.ceil(state.nextBossIn)}s</span></span>`);
+  }
+  if (state.objective && !state.objective.done) {
+    extra.push(
+      `<span>${state.objective.label} <span class="v">${Math.min(state.objective.progress, state.objective.target)}/${state.objective.target}</span></span>`,
+    );
+  }
+
   hudEl.innerHTML = [
     `<span>HP <span class="v">${hpPct}%</span></span>`,
     `<span>LVL <span class="v">${player.level}</span></span>`,
@@ -398,6 +424,7 @@ export function renderFrame(game) {
     `<span>WAVE <span class="v">${state.wave}</span></span>`,
     `<span>T- <span class="v">${waveLeftStr}</span></span>`,
     `<span>BEST <span class="v">${game.highScore?.bestKills ?? 0}</span></span>`,
+    ...extra,
   ].join("");
 
   // Highscore in menu (loaded from cookie in game.js -> game.highScore)
@@ -433,8 +460,23 @@ export function renderFrame(game) {
   // Menu visibility (start vs pause)
   const startMenu = document.getElementById("startMenu");
   const pauseMenu = document.getElementById("pauseMenu");
-  if (startMenu) startMenu.hidden = !!state.running || !!state.paused || !!state.gameOver;
-  if (pauseMenu) pauseMenu.hidden = !state.paused;
+  const upgradeMenu = document.getElementById("upgradeMenu");
+  if (startMenu) startMenu.hidden = !!state.running || !!state.paused || !!state.gameOver || !!state.upgradeMenu;
+  if (pauseMenu) pauseMenu.hidden = !state.paused || !!state.upgradeMenu;
+  if (upgradeMenu) upgradeMenu.hidden = !state.upgradeMenu;
+
+  // Upgrade options UI
+  if (state.upgradeMenu) {
+    const btn0 = document.getElementById("btnUp0");
+    const btn1 = document.getElementById("btnUp1");
+    const btn2 = document.getElementById("btnUp2");
+    const h = document.getElementById("upgradeHint");
+    const opts = state.upgradeChoices || [];
+    if (btn0) btn0.textContent = `1 — ${(opts[0]?.title ?? "…")} (${opts[0]?.desc ?? ""})`;
+    if (btn1) btn1.textContent = `2 — ${(opts[1]?.title ?? "…")} (${opts[1]?.desc ?? ""})`;
+    if (btn2) btn2.textContent = `3 — ${(opts[2]?.title ?? "…")} (${opts[2]?.desc ?? ""})`;
+    if (h) h.textContent = `Choisis 1–3. (${Math.max(1, state.upgradeRemaining || 1)} restant)`;
+  }
 
   // Pause button enable/disable
   const btnPauseTop = document.getElementById("btnPauseTop");
@@ -477,7 +519,10 @@ export function renderFrame(game) {
     ctx.restore();
   }
 
-  if (state.gameOver) {
+  if (state.upgradeMenu) {
+    overlayEl.querySelector(".title").textContent = "UPGRADE";
+    overlayEl.querySelector(".hint").textContent = "Choisis 1–3 pour améliorer ton build.";
+  } else if (state.gameOver) {
     overlayEl.querySelector(".title").textContent = "GAME OVER";
     overlayEl.querySelector(".hint").textContent = `Kills: ${state.kills} — Best: ${game.highScore?.bestKills ?? 0} — Appuie sur R.`;
   } else if (state.paused) {

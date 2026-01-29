@@ -30,6 +30,8 @@ export function createPlayer(hero) {
       fireRateMul: hero?.buffs?.fireRateMul ?? 1,
       moveSpeedMul: hero?.buffs?.moveSpeedMul ?? 1,
       dmgMul: hero?.buffs?.dmgMul ?? 1,
+      // gameplay perks (small, stackable)
+      ricochetChanceAdd: 0, // added to base wall ricochet chance
     },
   };
   // apply start weapons
@@ -101,6 +103,11 @@ export function createEnemy({ x, y, kind, wave, diff }) {
       xp: 2,
       isBoss: false,
       shootCd: randRange(0.2, 1.0),
+      // telegraph before shooting
+      windT: 0,
+      windDx: 0,
+      windDy: 0,
+      windDmg: 0,
     };
   }
   if (kind === "boss") {

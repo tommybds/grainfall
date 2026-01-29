@@ -74,22 +74,32 @@ export function updateEnemies(dt, game) {
 
     // special: spitter shoots low-dmg bullets
     if (e.kind === "spitter") {
-      e.shootCd -= dt;
-      if (e.shootCd <= 0) {
-        e.shootCd = clamp(1.9 - state.wave * 0.08, 0.6, 1.9);
-        // shoot towards player
-        const dv = norm(player.x - e.x, player.y - e.y);
-        game.enemyBullets.push(
-          createBullet({
-            x: e.x,
-            y: e.y,
-            vx: dv.x * 240,
-            vy: dv.y * 240,
-            dmg: 9 + state.wave * 0.6,
-            ttl: 2.1,
-            r: 3,
-          }),
-        );
+      // wind-up telegraph, then fire
+      if ((e.windT || 0) > 0) {
+        e.windT = Math.max(0, e.windT - dt);
+        if (e.windT <= 0) {
+          game.enemyBullets.push(
+            createBullet({
+              x: e.x,
+              y: e.y,
+              vx: (e.windDx || 0) * 240,
+              vy: (e.windDy || 0) * 240,
+              dmg: e.windDmg || (9 + state.wave * 0.6),
+              ttl: 2.1,
+              r: 3,
+            }),
+          );
+        }
+      } else {
+        e.shootCd -= dt;
+        if (e.shootCd <= 0) {
+          e.shootCd = clamp(1.9 - state.wave * 0.08, 0.6, 1.9);
+          const dv = norm(player.x - e.x, player.y - e.y);
+          e.windT = 0.28;
+          e.windDx = dv.x;
+          e.windDy = dv.y;
+          e.windDmg = 9 + state.wave * 0.6;
+        }
       }
     }
 
@@ -139,12 +149,13 @@ export function updateBullets(dt, game) {
     }
 
     // Walls: mostly destroy, sometimes ricochet.
+    const ricochetChance = clamp(0.32 + (game.player?.buffs?.ricochetChanceAdd || 0), 0, 0.82);
     const wallRes = bounceOrDestroyBullet({
       bullet: b,
       prevX,
       prevY,
       mapId: game.selectedMapId,
-      ricochetChance: 0.32,
+      ricochetChance,
       dampMin: 0.70,
       dampMax: 0.88,
     });

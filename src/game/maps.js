@@ -10,7 +10,7 @@ export const MAPS = [
       vignette: 0.55,
     },
     // very few walls, mostly open
-    tiles: { wall: 0.012, ice: 0.035 },
+    tiles: { wall: 0.012, ice: 0.0 },
   },
   {
     id: "plains",
@@ -24,7 +24,7 @@ export const MAPS = [
       vignette: 0.42,
     },
     // no walls in plains
-    tiles: { wall: 0.0, ice: 0.015 },
+    tiles: { wall: 0.0, ice: 0.0 },
   },
   {
     id: "winter",
@@ -52,7 +52,7 @@ export const MAPS = [
       vignette: 0.66,
     },
     // some walls, but not overwhelming
-    tiles: { wall: 0.045, ice: 0.09 },
+    tiles: { wall: 0.045, ice: 0.0 },
   },
 ];
 

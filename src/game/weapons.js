@@ -78,17 +78,25 @@ export function updateWeapons(dt, game) {
       const dmg = (18 + w.lvl * 4) * player.buffs.dmgMul;
       const speed = 430;
       game.audio?.shoot?.("pistol");
-      shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.12 });
+      // Level milestones: extra shots
+      const shots = 1 + (w.lvl >= 4 ? 1 : 0) + (w.lvl >= 7 ? 1 : 0);
+      if (shots === 1) {
+        shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.12 });
+      } else {
+        for (let s = 0; s < shots; s++) {
+          shoot(game, { tx: target.x, ty: target.y, speed, dmg: dmg * 0.8, spread: 0.18 });
+        }
+      }
       w.cd = 1 / rate;
       continue;
     }
 
     if (w.id === "shotgun") {
       const rate = (1.2 + w.lvl * 0.12) * player.buffs.fireRateMul;
-      const pellets = 3 + Math.floor(w.lvl / 2);
+      const pellets = 3 + Math.floor(w.lvl / 2) + (w.lvl >= 6 ? 2 : 0);
       const dmg = (10 + w.lvl * 2.5) * player.buffs.dmgMul;
       const speed = 390;
-      const spread = 0.75;
+      const spread = w.lvl >= 5 ? 0.62 : 0.75;
       game.audio?.shoot?.("shotgun");
       for (let p = 0; p < pellets; p++) {
         shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread });
@@ -103,7 +111,9 @@ export function updateWeapons(dt, game) {
       const dmg = (34 + w.lvl * 9) * player.buffs.dmgMul;
       const speed = 520;
       game.audio?.shoot?.("lance");
-      shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.06, pierce: 2, ttl: 1.3 });
+      const pierce = 2 + Math.floor((w.lvl - 1) / 2);
+      const ttl = 1.2 + w.lvl * 0.03;
+      shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.06, pierce, ttl });
       w.cd = 1 / rate;
       continue;
     }

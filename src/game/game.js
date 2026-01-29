@@ -361,6 +361,12 @@ export function runGameLoop(game) {
   function startLoop() {
     if (rafId) return;
     suspended = false;
+    // Page is visible/focused again: resume music scheduler if enabled
+    try {
+      game.audio?.setBackgrounded?.(false);
+    } catch {
+      // ignore
+    }
     // Avoid a huge dt spike after being hidden.
     game.state.lastMs = performance.now();
     rafId = requestAnimationFrame(tick);
@@ -368,6 +374,12 @@ export function runGameLoop(game) {
 
   function stopLoop() {
     suspended = true;
+    // Page is hidden/unfocused: stop music like the game loop
+    try {
+      game.audio?.setBackgrounded?.(true);
+    } catch {
+      // ignore
+    }
     if (!rafId) return;
     cancelAnimationFrame(rafId);
     rafId = 0;

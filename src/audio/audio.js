@@ -81,6 +81,7 @@ export function createAudio() {
   let mode = "sfx"; // "sfx" | "music"
   let scoreId = MUSIC_SCORE_IDS[0] || "a_minor_chill";
   let intensity = 0; // 0..1 from game progression
+  let backgrounded = false; // page not focused / hidden
   // User-mix volumes (0..1)
   let musicVol = 0.85;
   let sfxVol = 0.85;
@@ -175,9 +176,14 @@ export function createAudio() {
     musicBus.gain.value = clamp01(musicVol) * 0.95;
   }
 
+  function syncMasterGain() {
+    if (!master) return;
+    master.gain.value = (muted || backgrounded) ? 0 : 0.62;
+  }
+
   function setMuted(v) {
     muted = !!v;
-    if (master) master.gain.value = muted ? 0 : 0.62;
+    syncMasterGain();
     syncMusicScheduler();
   }
 
@@ -224,7 +230,15 @@ export function createAudio() {
   }
 
   function isMusicActive() {
-    return !!(unlocked && !muted && mode === "music");
+    return !!(unlocked && !muted && !backgrounded && mode === "music");
+  }
+
+  function setBackgrounded(v) {
+    backgrounded = !!v;
+    syncMasterGain();
+    // When hidden/unfocused, stop the scheduler to avoid a backlog/burst on return.
+    if (backgrounded) stopMusicScheduler();
+    else syncMusicScheduler();
   }
 
   function stopMusicScheduler() {
@@ -678,6 +692,7 @@ export function createAudio() {
       mode,
       scoreId,
       intensity,
+      backgrounded,
       volume: { music: musicVol, sfx: sfxVol, master: master?.gain?.value ?? 0 },
       layers: {
         pad: padOn,
@@ -706,6 +721,7 @@ export function createAudio() {
   return {
     unlock,
     setMuted,
+    setBackgrounded,
     shoot,
     hit,
     explode,

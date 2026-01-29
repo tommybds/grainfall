@@ -259,7 +259,29 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
 }
 
 export function runGameLoop(game) {
+  let rafId = 0;
+  let suspended = document.hidden;
+
+  function startLoop() {
+    if (rafId) return;
+    suspended = false;
+    // Avoid a huge dt spike after being hidden.
+    game.state.lastMs = performance.now();
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function stopLoop() {
+    suspended = true;
+    if (!rafId) return;
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+
   function tick() {
+    if (suspended || document.hidden) {
+      stopLoop();
+      return;
+    }
     resizeCanvasToViewport(game.canvas, game.ctx, game.viewport);
 
     const now = performance.now();
@@ -275,10 +297,24 @@ export function runGameLoop(game) {
     }
 
     renderFrame(game);
-    requestAnimationFrame(tick);
+    rafId = requestAnimationFrame(tick);
   }
 
-  requestAnimationFrame(tick);
+  document.addEventListener(
+    "visibilitychange",
+    () => {
+      if (document.hidden) stopLoop();
+      else startLoop();
+    },
+    { passive: true },
+  );
+
+  // Also handle bfcache / tab restore.
+  window.addEventListener("pagehide", stopLoop, { passive: true });
+  window.addEventListener("pageshow", startLoop, { passive: true });
+
+  if (document.hidden) stopLoop();
+  else startLoop();
 }
 
 function update(dt, game) {

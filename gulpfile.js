@@ -55,8 +55,11 @@ function copyHtmlProd() {
         // Use bundled JS in prod
         let out = s.replace(
           /<script\s+src="\.\/main\.js"\s+type="module"><\/script>/g,
-          '<script src="./assets/bundle.js" defer></script>',
+          `<script src="./assets/bundle.js?v=${pkg.version}" defer></script>`,
         );
+
+        // Cache-bust main stylesheet in prod
+        out = out.replace(/href="\.\/styles\.css"/g, `href="./styles.css?v=${pkg.version}"`);
 
         // Inject version from package.json into the HTML (so it's visible even before JS runs)
         const v = `v${pkg.version}`;

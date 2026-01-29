@@ -723,8 +723,13 @@ export function renderFrame(game) {
       function progressFor(def) {
         if (def.kind === "killsTotal") return st.killsTotal || 0;
         if (def.kind === "bestTime") return st.bestTime || 0;
+        if (def.kind === "bestWave") return st.bestWave || 0;
+        if (def.kind === "bestKills") return st.bestKills || 0;
+        if (def.kind === "runs") return st.runs || 0;
         if (def.kind === "weapon") return st.killsByWeapon?.[def.key] || 0;
         if (def.kind === "enemy") return st.killsByEnemy?.[def.key] || 0;
+        if (def.kind === "coinsPicked") return st.coinsPicked || 0;
+        if (def.kind === "pickup") return st.pickupsByKind?.[def.key] || 0;
         return 0;
       }
       ach.innerHTML = ACHIEVEMENT_DEFS.map((def) => {

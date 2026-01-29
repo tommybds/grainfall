@@ -10,7 +10,14 @@ function killEnemy(game, idx, sourceKind) {
   if (!e) return;
   const weaponKind = sourceKind || e.dotSourceKind || e.lastHitKind || "unknown";
   try {
-    recordKill({ run: game.runStats, lifetime: game.lifetimeStats, weaponKind, enemyKind: e.kind || "unknown" });
+    const enemyKind = e.kind || "unknown";
+    recordKill({
+      run: game.runStats,
+      lifetime: game.lifetimeStats,
+      weaponKind,
+      enemyKind,
+      enemyBossType: enemyKind === "boss" ? e.bossType || "summoner" : null,
+    });
     updateAchievements(game.lifetimeStats);
   } catch {
     // ignore

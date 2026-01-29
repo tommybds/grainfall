@@ -3,6 +3,11 @@ import { CFG } from "./config.js";
 import { createPickup } from "./entities.js";
 import { ensureWeapon, upgradeWeapon, weaponName, WEAPON_MAX_LEVEL } from "./weapons.js";
 
+function inc(map, key, n = 1) {
+  if (!map || !key) return;
+  map[key] = (map[key] || 0) + n;
+}
+
 export function generateUpgradeChoices(game) {
   const player = game.player;
   const choices = [];
@@ -162,6 +167,33 @@ export function maybeDropPickup(game, x, y, enemy) {
 
 export function applyPickup(game, p) {
   const player = game.player;
+
+  // Stats tracking (persistent + per-run)
+  try {
+    const run = game.runStats;
+    const life = game.lifetimeStats;
+    if (run) {
+      run.pickupsTotal = (run.pickupsTotal || 0) + 1;
+      run.pickupsByKind = run.pickupsByKind || {};
+      inc(run.pickupsByKind, p.kind, 1);
+    }
+    if (life) {
+      life.pickupsTotal = (life.pickupsTotal || 0) + 1;
+      life.pickupsByKind = life.pickupsByKind || {};
+      inc(life.pickupsByKind, p.kind, 1);
+      if (p.kind === "coin") {
+        life.coinsPicked = (life.coinsPicked || 0) + 1;
+        life.coinsValueTotal = (life.coinsValueTotal || 0) + (p.value || 0);
+      }
+      if (run && p.kind === "coin") {
+        run.coinsPicked = (run.coinsPicked || 0) + 1;
+        run.coinsValueTotal = (run.coinsValueTotal || 0) + (p.value || 0);
+      }
+    }
+  } catch {
+    // ignore
+  }
+
   if (game.discoveredPickups && !game.discoveredPickups[p.kind]) {
     game.discoveredPickups[p.kind] = true;
     const name =

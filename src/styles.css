@@ -191,7 +191,10 @@ body {
   /* Hide ugly scrollbars (still scrollable) */
   scrollbar-width: none; /* Firefox */
 }
-.panel::-webkit-scrollbar { display: none; } /* WebKit */
+/* WebKit (Chrome/Safari): hide even when "always show scrollbars" is enabled */
+.panel::-webkit-scrollbar { width: 0; height: 0; }
+.panel::-webkit-scrollbar-thumb { background: transparent; }
+.panel::-webkit-scrollbar-track { background: transparent; }
 
 /* Make menus clickable only when overlay is active (pause/menu/game over) */
 .overlay[data-active="true"] { pointer-events: auto; }

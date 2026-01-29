@@ -316,9 +316,30 @@ const heroGroup = wireGroup({
 const btnUp0 = document.getElementById("btnUp0");
 const btnUp1 = document.getElementById("btnUp1");
 const btnUp2 = document.getElementById("btnUp2");
-btnUp0?.addEventListener("click", () => game.chooseUpgrade?.(0));
-btnUp1?.addEventListener("click", () => game.chooseUpgrade?.(1));
-btnUp2?.addEventListener("click", () => game.chooseUpgrade?.(2));
+let lastUpgradePickMs = 0;
+function pickUpgrade(idx, ev) {
+  // Guard against double-trigger (pointer + click) and noisy devices.
+  const t = performance.now();
+  if (t - lastUpgradePickMs < 220) return;
+  lastUpgradePickMs = t;
+  game.chooseUpgrade?.(idx);
+  if (ev) {
+    try {
+      ev.preventDefault?.();
+      ev.stopPropagation?.();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+btnUp0?.addEventListener("click", () => pickUpgrade(0));
+btnUp1?.addEventListener("click", () => pickUpgrade(1));
+btnUp2?.addEventListener("click", () => pickUpgrade(2));
+// Some environments don't emit click reliably (mobile layout + mouse/trackpad).
+btnUp0?.addEventListener("pointerdown", (e) => pickUpgrade(0, e), { passive: false });
+btnUp1?.addEventListener("pointerdown", (e) => pickUpgrade(1, e), { passive: false });
+btnUp2?.addEventListener("pointerdown", (e) => pickUpgrade(2, e), { passive: false });
 
 window.addEventListener(
   "keydown",

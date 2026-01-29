@@ -1,5 +1,6 @@
 let ctx = null;
 let master = null;
+let limiter = null;
 let unlocked = false;
 
 import { MUSIC_SCORES, MUSIC_SCORE_IDS } from "./musicScores.js";
@@ -8,8 +9,17 @@ function ensureCtx() {
   if (ctx) return;
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   master = ctx.createGain();
-  master.gain.value = 0.35;
-  master.connect(ctx.destination);
+  // Slightly louder by default; a limiter keeps it safe.
+  master.gain.value = 0.62;
+  limiter = ctx.createDynamicsCompressor();
+  // Soft limiter/compressor (safe peaks, higher perceived loudness)
+  limiter.threshold.value = -18;
+  limiter.knee.value = 12;
+  limiter.ratio.value = 8;
+  limiter.attack.value = 0.003;
+  limiter.release.value = 0.18;
+  master.connect(limiter);
+  limiter.connect(ctx.destination);
 }
 
 function now() {
@@ -71,11 +81,18 @@ export function createAudio() {
   let mode = "sfx"; // "sfx" | "music"
   let scoreId = MUSIC_SCORE_IDS[0] || "a_minor_chill";
   let intensity = 0; // 0..1 from game progression
+  // User-mix volumes (0..1)
+  let musicVol = 0.85;
+  let sfxVol = 0.85;
 
   let sfxBus = null;
   let musicBus = null;
   let padBus = null;
   let padFilter = null;
+  let leadBus = null;
+  let leadDelay = null;
+  let leadDelayFb = null;
+  let leadDelayWet = null;
 
   // Debug counters (anti-cacophony visibility)
   const dbg = {
@@ -105,6 +122,9 @@ export function createAudio() {
       mask: Object.create(null),
       count: 0,
     },
+    chordDegree: 0,
+    // Intro bars: start with groove, then pads enter.
+    introBars: 2,
   };
 
   const cd = {
@@ -122,6 +142,10 @@ export function createAudio() {
     musicBus = ctx.createGain();
     padBus = ctx.createGain();
     padFilter = ctx.createBiquadFilter();
+    leadBus = ctx.createGain();
+    leadDelay = ctx.createDelay(0.35);
+    leadDelayFb = ctx.createGain();
+    leadDelayWet = ctx.createGain();
     padFilter.type = "lowpass";
     padFilter.Q.value = 0.7;
     padFilter.frequency.value = 900;
@@ -132,19 +156,28 @@ export function createAudio() {
     // pad -> filter -> music bus -> master
     padBus.connect(padFilter);
     padFilter.connect(musicBus);
+    // lead -> (dry + delay) -> music bus
+    leadBus.connect(musicBus);
+    leadBus.connect(leadDelay);
+    leadDelay.connect(leadDelayWet);
+    leadDelayWet.connect(musicBus);
+    // feedback loop (subtle, safe)
+    leadDelay.connect(leadDelayFb);
+    leadDelayFb.connect(leadDelay);
     musicBus.connect(master);
   }
 
   function syncBusGains() {
     if (!sfxBus || !musicBus) return;
     // In music mode, keep SFX subtle (hits/explosions/pickups) so it doesn't fight the music.
-    sfxBus.gain.value = mode === "music" ? 0.55 : 1.0;
-    musicBus.gain.value = 0.95;
+    const sfxModeMul = mode === "music" ? 0.55 : 1.0;
+    sfxBus.gain.value = clamp01(sfxVol) * sfxModeMul;
+    musicBus.gain.value = clamp01(musicVol) * 0.95;
   }
 
   function setMuted(v) {
     muted = !!v;
-    if (master) master.gain.value = muted ? 0 : 0.35;
+    if (master) master.gain.value = muted ? 0 : 0.62;
     syncMusicScheduler();
   }
 
@@ -214,6 +247,7 @@ export function createAudio() {
     music.nextT = music.startT;
     // 16th note grid
     music.stepDur = (60 / (sc.bpm || 110)) / 4;
+    music.introBars = Math.max(0, (sc.introBars ?? 2) | 0);
     music.timer = setInterval(tickScheduler, 25);
   }
 
@@ -337,6 +371,20 @@ export function createAudio() {
     noise({ dur: 0.030, gain, out: musicBus, attack: 0.002 });
   }
 
+  function scheduleHat(t0, gain) {
+    noise({ dur: 0.010, gain, out: musicBus, attack: 0.001 });
+  }
+
+  function scheduleBass(sc, t0, degOffset, gain) {
+    const scale = sc.scale || [0, 2, 3, 5, 7, 8, 10];
+    const chord = (music.chordDegree || 0) | 0;
+    const di = ((chord + (degOffset | 0)) % scale.length + scale.length) % scale.length;
+    const root = sc.rootMidi || 57;
+    const midi = root + scale[di] - 24;
+    beep({ type: "triangle", freq: midiToFreq(midi), dur: 0.10, gain, detune: -4, out: musicBus, attack: 0.004 });
+    dbg.notesScheduled += 1;
+  }
+
   function scheduleArp(sc, t0, kind, gainMul = 1) {
     const scale = sc.scale || [0, 2, 3, 5, 7, 8, 10];
     const deg = noteForWeapon(sc, kind);
@@ -357,25 +405,41 @@ export function createAudio() {
       scale[((deg % scale.length) + scale.length) % scale.length] +
       12;
     const g = (0.016 + 0.020 * intensity) * gainMul;
-    beep({ type: "sawtooth", freq: midiToFreq(midi), dur: 0.11, gain: g, detune: -6, out: musicBus });
+    beep({ type: "sawtooth", freq: midiToFreq(midi), dur: 0.11, gain: g, detune: -6, out: leadBus || musicBus });
     dbg.notesScheduled += 1;
+  }
+
+  function swungTime(sc, t0, inBar) {
+    const sw = Number(sc.swing || 0);
+    if (!sw) return t0;
+    // basic 16th swing: delay odd steps slightly
+    return (inBar % 2 === 1) ? (t0 + music.stepDur * sw) : t0;
   }
 
   function scheduleMusicStep(sc, t0, step) {
     const stepsPerBar = 16;
     const bar = Math.floor(step / stepsPerBar);
     const inBar = step % stepsPerBar;
+    const inIntro = bar < (music.introBars || 0);
     // New bar -> chord / pad layer
     if (inBar === 0) {
       const prog = sc.chordProg || [0, 5, 3, 4];
       let degree = prog[bar % prog.length] || 0;
       // tiny turnaround so it doesn't feel like "same 4 bars"
       if ((prog.length || 0) <= 4 && (bar % 8) === 7) degree = prog[(bar + 1) % prog.length] || degree;
-      scheduleChord(sc, t0, music.stepDur * stepsPerBar, degree, bar);
-    }
-    // Optional: subtle hi-hat when intensity is high (keeps it alive)
-    if (intensity >= 0.78 && (inBar % 8 === 4)) {
-      noise({ dur: 0.010, gain: 0.007 + 0.010 * intensity, out: musicBus, attack: 0.002 });
+      music.chordDegree = degree | 0;
+      // per-score lead delay
+      if (leadDelay && leadDelayFb && leadDelayWet) {
+        const fx = sc.fx || {};
+        const dt = clamp01(Number(fx.leadDelayTime ?? 0.16)) * 0.35;
+        const fb = clamp01(Number(fx.leadDelayFb ?? 0.22)) * 0.60;
+        const mix = clamp01(Number(fx.leadDelayMix ?? 0.18)) * 0.70;
+        leadDelay.delayTime.setValueAtTime(Math.max(0.04, dt), t0);
+        leadDelayFb.gain.setValueAtTime(Math.min(0.45, fb), t0);
+        leadDelayWet.gain.setValueAtTime(mix, t0);
+      }
+      // Do not start with a pad: skip chord/pad during intro bars.
+      if (!inIntro) scheduleChord(sc, t0, music.stepDur * stepsPerBar, degree, bar);
     }
 
     // Progressive layers based on owned weapons (decoupled from firing rate).
@@ -388,18 +452,45 @@ export function createAudio() {
     const drumOn = hasWeapon("shotgun") && wc >= 2 && intensity >= 0.18;
     const leadOn = (hasWeapon("tesla") || hasWeapon("lance") || hasWeapon("laser")) && wc >= 2 && intensity >= 0.28;
     const texOn = hasWeapon("flame") && wc >= 3 && intensity >= 0.35;
+    const bassOn = intensity >= 0.48;
 
-    // Arp on 8ths (less busy)
-    if (arpOn && (inBar % 2 === 0)) scheduleArp(sc, t0, "pistol", 1.0);
+    const tS = swungTime(sc, t0, inBar);
+    const sectionBars = (sc.sectionBars || 8) | 0;
+    const section = sectionBars > 0 ? Math.floor(bar / sectionBars) % 2 : 0;
 
-    // Drums: kick on beats, snare on 2/4
-    if (drumOn) {
-      if (inBar === 0 || inBar === 8) scheduleKick(t0, 0.030 + 0.030 * intensity);
-      if (inBar === 4 || inBar === 12) scheduleSnare(t0, 0.010 + 0.010 * intensity);
+    // Intro groove: let drums/bass establish before pads (even without weapons).
+    if (inIntro && sc.drums) {
+      const d = sc.drums;
+      const mul = 0.55;
+      if (Array.isArray(d.kick) && d.kick.includes(inBar)) scheduleKick(t0, (d.kickGain || 0.06) * mul);
+      if (Array.isArray(d.snare) && d.snare.includes(inBar)) scheduleSnare(t0, (d.snareGain || 0.014) * mul);
+      if (Array.isArray(d.hat) && d.hat.includes(inBar)) scheduleHat(tS, (d.hatGain || 0.009) * mul);
     }
 
-    // Lead on quarters
-    if (leadOn && (inBar % 4 === 0)) scheduleLead(sc, t0, "lance", 0.90);
+    // Drums from score (unique groove per track)
+    if (drumOn && sc.drums) {
+      const d = sc.drums;
+      if (Array.isArray(d.kick) && d.kick.includes(inBar)) scheduleKick(t0, (d.kickGain || 0.06) * (0.75 + 0.55 * intensity));
+      if (Array.isArray(d.snare) && d.snare.includes(inBar)) scheduleSnare(t0, (d.snareGain || 0.014) * (0.65 + 0.45 * intensity));
+      if (Array.isArray(d.hat) && d.hat.includes(inBar)) scheduleHat(tS, (d.hatGain || 0.009) * (0.60 + 0.55 * intensity));
+      // Section B: slightly denser hats
+      if (section === 1 && intensity >= 0.55 && (inBar % 2 === 1)) scheduleHat(tS, (d.hatGain || 0.009) * 0.55);
+    }
+
+    // Bassline from score (ties harmony + identity)
+    if ((bassOn || inIntro) && sc.bass && Array.isArray(sc.bass.pat)) {
+      const deg = sc.bass.pat[inBar];
+      if (deg !== null && deg !== undefined) {
+        const mul = inIntro ? 0.55 : 1.0;
+        scheduleBass(sc, (inBar % 2 === 1 ? tS : t0), deg, (sc.bass.gain || 0.05) * (0.70 + 0.70 * intensity) * mul);
+      }
+    }
+
+    // Arp: on 8ths, swung if applicable
+    if (arpOn && (inBar % 2 === 0)) scheduleArp(sc, t0, "pistol", section === 1 ? 1.05 : 0.95);
+
+    // Lead: sparse, with delay (different per score)
+    if (leadOn && (inBar % 4 === 0)) scheduleLead(sc, t0, "lance", section === 1 ? 1.0 : 0.9);
 
     // Texture: small bursts, very subtle
     if (texOn && (inBar % 8 === 2)) {
@@ -550,6 +641,16 @@ export function createAudio() {
     intensity = mode === "music" ? Math.max(x, 0.22) : x;
   }
 
+  function setMusicVolume(v) {
+    musicVol = clamp01(Number(v));
+    syncBusGains();
+  }
+
+  function setSfxVolume(v) {
+    sfxVol = clamp01(Number(v));
+    syncBusGains();
+  }
+
   function setMusicMeta(meta) {
     const weps = meta?.weapons || [];
     music.meta.weapons = weps;
@@ -577,6 +678,7 @@ export function createAudio() {
       mode,
       scoreId,
       intensity,
+      volume: { music: musicVol, sfx: sfxVol, master: master?.gain?.value ?? 0 },
       layers: {
         pad: padOn,
         bass: bassOn,
@@ -614,6 +716,8 @@ export function createAudio() {
     setScore,
     setIntensity,
     setMusicMeta,
+    setMusicVolume,
+    setSfxVolume,
     getDebugInfo,
     get muted() {
       return muted;

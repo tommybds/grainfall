@@ -63,9 +63,11 @@ const DEFAULT_SETTINGS = {
   musicScoreChoice: "random",
   // last actually selected score id (used when choice is random)
   musicScoreId: MUSIC_SCORE_IDS[0] || "a_minor_chill",
+  musicVol: 0.85,
+  sfxVol: 0.85,
 };
 
-/** @type {{muted:boolean, musicMode:boolean, musicScoreChoice:string, musicScoreId:string}} */
+/** @type {{muted:boolean, musicMode:boolean, musicScoreChoice:string, musicScoreId:string, musicVol:number, sfxVol:number}} */
 let settings = { ...DEFAULT_SETTINGS };
 
 function scoreLabel(id) {
@@ -77,6 +79,8 @@ function applySettingsToAudio() {
   game.audio?.setMode?.(settings.musicMode ? "music" : "sfx");
   // Apply current/last score immediately (random picks are handled on enable/start).
   if (settings.musicScoreId) game.audio?.setScore?.(settings.musicScoreId);
+  game.audio?.setMusicVolume?.(settings.musicVol);
+  game.audio?.setSfxVolume?.(settings.sfxVol);
 }
 
 function updateMusicButtons() {
@@ -173,9 +177,38 @@ loadSignedLocal(SETTINGS_KEY, DEFAULT_SETTINGS).then((st) => {
   ensureMusicScoreSelectOptions();
   syncMusicScoreSelects();
   updateMusicButtons();
+  syncVolumeSliders();
   const btnSoundTop = document.getElementById("btnSoundTop");
   if (btnSoundTop) btnSoundTop.textContent = settings.muted ? "SND" : "MUTE";
 });
+
+function fmtPct(x) {
+  return `${Math.round((Number(x) || 0) * 100)}%`;
+}
+
+function syncVolumeSliders() {
+  const m = Number(settings.musicVol ?? 0.85);
+  const s = Number(settings.sfxVol ?? 0.85);
+
+  const rMStart = document.getElementById("rngMusicVolStart");
+  const rMPause = document.getElementById("rngMusicVolPause");
+  const rSStart = document.getElementById("rngSfxVolStart");
+  const rSPause = document.getElementById("rngSfxVolPause");
+
+  if (rMStart) rMStart.value = String(m);
+  if (rMPause) rMPause.value = String(m);
+  if (rSStart) rSStart.value = String(s);
+  if (rSPause) rSPause.value = String(s);
+
+  const lMStart = document.getElementById("lblMusicVolStart");
+  const lMPause = document.getElementById("lblMusicVolPause");
+  const lSStart = document.getElementById("lblSfxVolStart");
+  const lSPause = document.getElementById("lblSfxVolPause");
+  if (lMStart) lMStart.textContent = `Volume musique ${fmtPct(m)}`;
+  if (lMPause) lMPause.textContent = `Volume musique ${fmtPct(m)}`;
+  if (lSStart) lSStart.textContent = `Volume SFX ${fmtPct(s)}`;
+  if (lSPause) lSPause.textContent = `Volume SFX ${fmtPct(s)}`;
+}
 
 // If random is enabled, pick a new score at each run start.
 // We wrap start here so it also works for keyboard/touch start.
@@ -534,6 +567,26 @@ document.getElementById("selMusicScorePause")?.addEventListener("change", (e) =>
   }
   persistSettings();
 });
+
+// Volume sliders
+function onMusicVol(v) {
+  settings.musicVol = Math.max(0, Math.min(1, Number(v)));
+  game.audio?.setMusicVolume?.(settings.musicVol);
+  syncVolumeSliders();
+  persistSettings();
+}
+function onSfxVol(v) {
+  settings.sfxVol = Math.max(0, Math.min(1, Number(v)));
+  game.audio?.setSfxVolume?.(settings.sfxVol);
+  syncVolumeSliders();
+  persistSettings();
+}
+
+document.getElementById("rngMusicVolStart")?.addEventListener("input", (e) => onMusicVol(e?.target?.value));
+document.getElementById("rngMusicVolPause")?.addEventListener("input", (e) => onMusicVol(e?.target?.value));
+document.getElementById("rngSfxVolStart")?.addEventListener("input", (e) => onSfxVol(e?.target?.value));
+document.getElementById("rngSfxVolPause")?.addEventListener("input", (e) => onSfxVol(e?.target?.value));
+syncVolumeSliders();
 
 // --- Debug overlay (toggle with K) ---
 {

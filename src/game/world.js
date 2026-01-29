@@ -17,7 +17,8 @@ function hash01(cx, cy, salt = 0) {
 
 export function sampleTile(mapId, cx, cy) {
   const map = mapById(mapId);
-  const t = map.tiles || { wall: 0.06, ice: 0.04, mud: 0.05 };
+  // Default tiles should stay "neutral": no mud unless a map opts in.
+  const t = map.tiles || { wall: 0.06, ice: 0.04, mud: 0.0 };
 
   const rWall = hash01(cx, cy, 1);
   const rBiome = hash01(cx, cy, 2);

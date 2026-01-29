@@ -10,7 +10,7 @@ export const MAPS = [
       vignette: 0.55,
     },
     // very few walls, mostly open
-    tiles: { wall: 0.012, ice: 0.035, mud: 0.04 },
+    tiles: { wall: 0.012, ice: 0.035, mud: 0.0 },
   },
   {
     id: "plains",
@@ -27,6 +27,20 @@ export const MAPS = [
     tiles: { wall: 0.0, ice: 0.015, mud: 0.12 },
   },
   {
+    id: "winter",
+    name: "Hiver (Verglas)",
+    theme: {
+      // visible cold blue background
+      bg: "#071420",
+      fg: "#eef6ff",
+      dim: "rgba(238,246,255,0.55)",
+      grain: 0.12,
+      vignette: 0.58,
+    },
+    // very slippery: lots of ice, no mud
+    tiles: { wall: 0.02, ice: 0.19, mud: 0.0 },
+  },
+  {
     id: "hell",
     name: "Enfer (Rouge)",
     theme: {
@@ -38,7 +52,7 @@ export const MAPS = [
       vignette: 0.66,
     },
     // some walls, but not overwhelming
-    tiles: { wall: 0.045, ice: 0.09, mud: 0.015 },
+    tiles: { wall: 0.045, ice: 0.09, mud: 0.0 },
   },
 ];
 

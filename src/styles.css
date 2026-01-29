@@ -1,0 +1,341 @@
+:root {
+  --bg: #070707;
+  --fg: #f2f2f2;
+  --muted: rgba(242, 242, 242, 0.7);
+  --muted2: rgba(242, 242, 242, 0.5);
+  --line: rgba(242, 242, 242, 0.16);
+  --panel: rgba(0, 0, 0, 0.65);
+  --shadow: rgba(0, 0, 0, 0.7);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(1200px 700px at 50% 30%, #101010, var(--bg));
+  color: var(--fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.shell {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(0,0,0,0.2));
+  backdrop-filter: blur(8px);
+}
+
+.brand { display: flex; gap: 12px; align-items: baseline; }
+.logo {
+  letter-spacing: 0.32em;
+  font-weight: 700;
+  font-size: 13px;
+}
+.sub { color: var(--muted2); font-size: 12px; }
+
+.hud {
+  color: var(--muted);
+  font-size: 12px;
+  display: flex;
+  gap: 14px;
+  white-space: nowrap;
+}
+.hud .v { color: var(--fg); }
+
+.hudWrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.pauseBtn {
+  pointer-events: auto;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+  color: var(--fg);
+}
+.pauseBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--line);
+  background: #000;
+  box-shadow: 0 20px 80px var(--shadow);
+  image-rendering: auto;
+  touch-action: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.panel {
+  pointer-events: none;
+  width: min(560px, calc(100vw - 36px));
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 12px 60px var(--shadow);
+  padding: 18px 18px 16px;
+}
+
+/* Make menus clickable only when overlay is active (pause/menu/game over) */
+.overlay[data-active="true"] { pointer-events: auto; }
+.overlay[data-active="true"] .panel { pointer-events: auto; }
+
+.maps { margin-bottom: 12px; }
+.mapsTitle {
+  letter-spacing: 0.22em;
+  color: var(--muted2);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.mapList { display: grid; gap: 6px; }
+.mapBtn {
+  pointer-events: auto;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  padding: 10px 10px;
+}
+.diffBtn, .heroBtn {
+  pointer-events: auto;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  padding: 10px 10px;
+}
+.mapBtn[aria-selected="true"] {
+  color: var(--fg);
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.08);
+}
+.mapBtn:disabled, .diffBtn:disabled, .heroBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.diffBtn[aria-selected="true"], .heroBtn[aria-selected="true"] {
+  color: var(--fg);
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.08);
+}
+
+.endStats {
+  margin-bottom: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  padding: 10px 10px;
+}
+.statsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin-top: 8px;
+}
+.stat {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 13px;
+}
+.stat .v { color: var(--fg); }
+
+.menuBtns {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.menuBtns--single {
+  grid-template-columns: 1fr;
+  margin-bottom: 10px;
+}
+.menuBtn {
+  pointer-events: auto;
+  font: inherit;
+  padding: 10px 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: var(--fg);
+}
+
+.heroCard {
+  margin-top: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  padding: 10px 10px;
+}
+.heroTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.heroName {
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  color: var(--fg);
+}
+.heroDesc {
+  font-size: 12px;
+  color: var(--muted2);
+}
+.heroStats {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+.heroGlyph {
+  font-size: 18px;
+  letter-spacing: 0.2em;
+}
+.title {
+  letter-spacing: 0.24em;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.rules { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+.k { color: var(--fg); }
+.hint { margin-top: 12px; color: var(--muted2); font-size: 12px; }
+
+.footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted2);
+  font-size: 11px;
+  background: linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.2));
+}
+code { color: var(--fg); }
+
+/* --- Mobile: prevent horizontal overflow that shifts layout (iOS/Chrome) --- */
+@media (max-width: 560px) {
+  .topbar {
+    /* Switch to a compact 2-row layout */
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  /* Allow flex children to actually shrink (prevents page from becoming wider than viewport) */
+  .brand,
+  .hudWrap,
+  .hud {
+    min-width: 0;
+  }
+
+  /* Put HUD + buttons on their own row */
+  .hudWrap {
+    width: 100%;
+    justify-content: initial;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Compact typography in topbar */
+  .logo { font-size: 12px; letter-spacing: 0.22em; }
+  .sub { font-size: 11px; }
+  .pauseBtn { padding: 6px 8px; font-size: 11px; }
+
+  /* HUD: single line, horizontally scrollable (compact + no layout shift) */
+  .hud {
+    font-size: 11px;
+    gap: 10px;
+    white-space: nowrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+  }
+  .hud::-webkit-scrollbar { display: none; } /* WebKit */
+
+  /* HUD: keep the most useful stats on mobile */
+  .hud > span:nth-child(3),
+  .hud > span:nth-child(4),
+  .hud > span:nth-child(8) {
+    display: none;
+  }
+
+  /* Menu panel: make it less tall on mobile */
+  .panel {
+    padding: 12px 12px 10px;
+    width: min(560px, calc(100vw - 24px));
+    max-height: calc(100vh - 120px);
+    overflow: auto;
+  }
+  .title { font-size: 13px; margin-bottom: 8px; }
+  .maps { margin-bottom: 8px; }
+  .mapsTitle { font-size: 10px; margin-bottom: 4px; }
+  .mapList {
+    gap: 5px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .mapBtn,
+  .diffBtn,
+  .heroBtn,
+  .menuBtn {
+    font-size: 12px;
+    padding: 8px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .menuBtns { margin-top: 8px; gap: 6px; }
+  .heroCard { margin-top: 8px; padding: 8px 8px; }
+  .heroGlyph { font-size: 16px; }
+  /* Hero card is tall; keep only the header on small screens */
+  .heroStats { display: none; }
+
+  /* Hide dev footer to free vertical space */
+  .footer { display: none; }
+
+  /* Optional: rules are verbose on small screens */
+  .rules { display: none; }
+  .hint { margin-top: 8px; font-size: 11px; }
+}
+

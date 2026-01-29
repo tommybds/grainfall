@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grainfall (ASCII)</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar" aria-label="HUD">
+        <div class="brand">
+          <span class="logo">GRAINFALL</span>
+          <span class="sub">ASCII / Noir &amp; Blanc</span>
+        </div>
+        <div class="hudWrap">
+          <div class="hud" id="hud"></div>
+          <button id="btnSoundTop" class="pauseBtn" type="button" aria-label="Son">SND</button>
+          <button id="btnPauseTop" class="pauseBtn" type="button" aria-label="Pause">PAUSE</button>
+        </div>
+      </header>
+
+      <main class="stage" aria-label="Jeu">
+        <canvas id="game" class="canvas" width="960" height="540"></canvas>
+        <div class="overlay" id="overlay" role="dialog" aria-modal="true" data-active="true">
+          <div class="panel">
+            <div class="title">GRAINFALL (ASCII)</div>
+            <div class="endStats" id="endStats" hidden>
+              <div class="mapsTitle">RÉSULTAT</div>
+              <div class="statsGrid">
+                <div class="stat"><span class="k">Kills</span> <span class="v" id="statKills">0</span></div>
+                <div class="stat"><span class="k">Wave</span> <span class="v" id="statWave">1</span></div>
+                <div class="stat"><span class="k">Temps</span> <span class="v" id="statTime">0:00</span></div>
+                <div class="stat"><span class="k">Best</span> <span class="v" id="statBest">0</span></div>
+              </div>
+              <div class="menuBtns">
+                <button id="btnEndRestart" class="menuBtn" type="button">Rejouer</button>
+                <button id="btnEndMenu" class="menuBtn" type="button">Menu</button>
+              </div>
+            </div>
+            <div id="startMenu">
+              <div class="endStats" id="menuScores">
+                <div class="mapsTitle">SCORES</div>
+                <div class="statsGrid">
+                  <div class="stat"><span class="k">Best Kills</span> <span class="v" id="bestKills">0</span></div>
+                  <div class="stat"><span class="k">Best Wave</span> <span class="v" id="bestWave">0</span></div>
+                </div>
+              </div>
+              <div class="maps">
+                <div class="mapsTitle">CARTE</div>
+                <div class="mapList">
+                  <button class="mapBtn" type="button" data-map="classic" aria-selected="true">1 — Classic</button>
+                  <button class="mapBtn" type="button" data-map="plains" aria-selected="false">2 — Plaine</button>
+                  <button class="mapBtn" type="button" data-map="hell" aria-selected="false">3 — Enfer</button>
+                </div>
+              </div>
+              <div class="maps">
+                <div class="mapsTitle">DIFFICULTÉ</div>
+                <div class="mapList">
+                  <button class="diffBtn" type="button" data-diff="easy" aria-selected="false">4 — Facile</button>
+                  <button class="diffBtn" type="button" data-diff="normal" aria-selected="true">5 — Normal</button>
+                  <button class="diffBtn" type="button" data-diff="hard" aria-selected="false">6 — Difficile</button>
+                </div>
+              </div>
+              <div class="maps">
+                <div class="mapsTitle">HÉROS</div>
+                <div class="mapList">
+                  <button class="heroBtn" type="button" data-hero="runner" aria-selected="true">7 — Runner</button>
+                  <button class="heroBtn" type="button" data-hero="tank" aria-selected="false">8 — Tank</button>
+                  <button class="heroBtn" type="button" data-hero="gunner" aria-selected="false">9 — Gunner</button>
+                </div>
+                <div class="heroCard" id="heroCard">
+                  <div class="heroTop">
+                    <span class="heroName" id="heroName">Runner</span>
+                    <span class="heroDesc" id="heroDesc">Rapide, fragile</span>
+                  </div>
+                  <div class="heroStats" id="heroStats">
+                    <div class="stat"><span class="k">HP</span> <span class="v" id="heroHp">0</span></div>
+                    <div class="stat"><span class="k">VIT</span> <span class="v" id="heroSpd">0</span></div>
+                    <div class="stat"><span class="k">RANGE</span> <span class="v" id="heroRange">0</span></div>
+                    <div class="stat"><span class="k">ARMES</span> <span class="v" id="heroWeps">-</span></div>
+                    <div class="stat"><span class="k">SKIN</span> <span class="v heroGlyph" id="heroSkin">?</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="menuBtns menuBtns--single">
+                <button id="btnStart" class="menuBtn" type="button">Démarrer</button>
+              </div>
+              <div class="rules">
+                <div><span class="k">Déplacement</span> ZQSD/WASD (auto) / Flèches</div>
+                <div><span class="k">Pause</span> P</div>
+                <div><span class="k">Recommencer</span> R</div>
+                <div><span class="k">Démarrer</span> Entrée</div>
+              </div>
+              <div class="hint">Choisis une carte, une difficulté, un héros — puis Entrée.</div>
+            </div>
+
+            <div id="pauseMenu" hidden>
+              <div class="mapsTitle">PAUSE</div>
+              <div class="endStats" id="pauseScores">
+                <div class="mapsTitle">HIGHSCORE</div>
+                <div class="statsGrid">
+                  <div class="stat"><span class="k">Best Kills</span> <span class="v" id="bestKillsPause">0</span></div>
+                  <div class="stat"><span class="k">Best Wave</span> <span class="v" id="bestWavePause">0</span></div>
+                </div>
+              </div>
+              <div class="menuBtns">
+                <button id="btnResume" class="menuBtn" type="button">Reprendre</button>
+                <button id="btnRestart" class="menuBtn" type="button">Recommencer</button>
+                <button id="btnMenu" class="menuBtn" type="button">Menu</button>
+              </div>
+              <div class="hint">Astuce: les héros ont des stats différentes (HP/vitesse/range/armes).</div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <span>Build statique via <code>npm run build</code> → <code>dist/</code></span>
+      </footer>
+    </div>
+
+    <script src="./main.js" type="module"></script>
+  </body>
+</html>
+

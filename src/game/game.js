@@ -1,0 +1,348 @@
+import { clamp, norm, randRange } from "../core/math.js";
+import { createViewport, resizeCanvasToViewport, dtFromMs } from "../core/viewport.js";
+import { createInput, attachInputListeners } from "../core/input.js";
+import { attachTouchJoystick } from "../core/touch.js";
+import { CFG } from "./config.js";
+import { createPlayer, createEnemy } from "./entities.js";
+import { updateWaves, spawnEnemyAtEdge } from "./waves.js";
+import { updateWeapons } from "./weapons.js";
+import { updateEnemies, updateBullets, updateEnemyBullets } from "./combat.js";
+import { applyPickup } from "./pickups.js";
+import { renderFrame } from "../render/renderer.js";
+import { len2 } from "../core/math.js";
+import { mapById } from "./maps.js";
+import { difficultyById } from "./difficulty.js";
+import { heroById } from "./heroes.js";
+import { loadHighScore, saveHighScore } from "./storage.js";
+import { createAudio } from "../audio/audio.js";
+import { sampleTile, resolveCircleVsWalls, worldToCell } from "./world.js";
+
+export function createGame({ canvas, ctx, hudEl, overlayEl }) {
+  const viewport = createViewport();
+  const input = createInput();
+
+  const game = {
+    canvas,
+    ctx,
+    hudEl,
+    overlayEl,
+
+    viewport,
+    input,
+
+    camera: { x: 0, y: 0 },
+    state: {
+      running: false,
+      paused: false,
+      gameOver: false,
+      t: 0,
+      lastMs: performance.now(),
+      kills: 0,
+      wave: 1,
+      waveJustStarted: false,
+      difficulty: 1,
+      diff: difficultyById("normal"),
+      spawnAcc: 0,
+      bossAlive: false,
+      bossWave: 0,
+      hitFlash: 0,
+      wallBumpT: 0,
+      wallBumpX: 0,
+      wallBumpY: 0,
+    },
+
+    player: createPlayer(heroById("runner")),
+    enemies: [],
+    bullets: [],
+    enemyBullets: [],
+    pickups: [],
+    floats: [],
+    discoveredPickups: { xp: false, heal: false, buff: false, chest: false },
+
+    theme: mapById("classic").theme,
+    selectedMapId: "classic",
+    selectedDifficultyId: "normal",
+    selectedHeroId: "runner",
+
+    highScore: { bestKills: 0, bestWave: 0 },
+    audio: createAudio(),
+    audioMuted: true,
+
+    detachInput: null,
+    detachTouch: null,
+
+    reset,
+    start,
+    endGame,
+    goToMenu,
+    setPaused,
+    togglePause,
+    spawnEnemyNear,
+  };
+
+  // Slight zoom-out on small screens so you see more of the world.
+  function updateZoom() {
+    const isMobile = window.matchMedia && window.matchMedia("(max-width: 560px)").matches;
+    game.viewport.zoom = isMobile ? 0.90 : 1;
+  }
+  updateZoom();
+  window.addEventListener("resize", updateZoom, { passive: true });
+  window.addEventListener("orientationchange", updateZoom, { passive: true });
+
+  // async init (cookie highscore)
+  loadHighScore().then((hs) => {
+    game.highScore = hs;
+  });
+
+  // start muted until user interaction unlocks audio
+  game.audio.setMuted(true);
+
+  function reset() {
+    game.state.running = false;
+    game.state.paused = false;
+    game.state.gameOver = false;
+    game.state.t = 0;
+    game.state.lastMs = performance.now();
+    game.state.kills = 0;
+    game.state.wave = 1;
+    game.state.spawnAcc = 0;
+    game.state.difficulty = 1;
+    game.state.bossAlive = false;
+    game.state.bossWave = 0;
+    game.state.hitFlash = 0;
+    game.state.wallBumpT = 0;
+    game.state.wallBumpX = 0;
+    game.state.wallBumpY = 0;
+
+    game.state.diff = difficultyById(game.selectedDifficultyId);
+    game.player = createPlayer(heroById(game.selectedHeroId));
+    game.enemies.length = 0;
+    game.bullets.length = 0;
+    game.enemyBullets.length = 0;
+    game.pickups.length = 0;
+    game.floats.length = 0;
+    game.discoveredPickups = { xp: false, heal: false, buff: false, chest: false };
+    game.camera.x = 0;
+    game.camera.y = 0;
+  }
+
+  function start() {
+    // use last selected map/theme
+    game.theme = mapById(game.selectedMapId).theme;
+    // Hell is always hard from the start
+    if (game.selectedMapId === "hell") game.selectedDifficultyId = "hard";
+    reset();
+    game.state.running = true;
+    game.overlayEl.style.opacity = "0";
+    game.overlayEl.dataset.active = "false";
+  }
+
+  function goToMenu() {
+    reset();
+    game.overlayEl.style.opacity = "1";
+    game.overlayEl.dataset.active = "true";
+  }
+
+  function setPaused(paused) {
+    if (!game.state.running || game.state.gameOver) return;
+    game.state.paused = !!paused;
+    game.overlayEl.style.opacity = game.state.paused ? "1" : "0";
+    game.overlayEl.dataset.active = game.state.paused ? "true" : "false";
+  }
+
+  async function endGame() {
+    game.state.gameOver = true;
+    game.state.running = false;
+    game.overlayEl.style.opacity = "1";
+    game.overlayEl.dataset.active = "true";
+
+    const newBestKills = Math.max(game.highScore.bestKills || 0, game.state.kills || 0);
+    const newBestWave = Math.max(game.highScore.bestWave || 0, game.state.wave || 0);
+    if (newBestKills !== game.highScore.bestKills || newBestWave !== game.highScore.bestWave) {
+      game.highScore = { bestKills: newBestKills, bestWave: newBestWave };
+      await saveHighScore(game.highScore);
+      game.floats.push({ x: game.player.x, y: game.player.y - 34, ttl: 1.6, text: "NEW HIGHSCORE" });
+    }
+    game.audio?.death?.();
+  }
+
+  function togglePause() {
+    if (game.state.gameOver) return;
+    setPaused(!game.state.paused);
+  }
+
+  function spawnEnemyNear(x, y, kind) {
+    if (game.enemies.length >= CFG.maxEnemies) return;
+    const a = Math.random() * Math.PI * 2;
+    const d = randRange(24, 52);
+    game.enemies.push(
+      createEnemy({
+        x: x + Math.cos(a) * d,
+        y: y + Math.sin(a) * d,
+        kind,
+        wave: game.state.wave,
+        diff: game.state.diff,
+      }),
+    );
+  }
+
+  game.detachInput = attachInputListeners({
+    input: game.input,
+    onTogglePause: togglePause,
+    onRestart: start,
+    onStart: () => {
+      if (!game.state.running) start();
+    },
+  });
+
+  game.detachTouch = attachTouchJoystick({ canvas: game.canvas, viewport: game.viewport, input: game.input });
+
+  return game;
+}
+
+export function runGameLoop(game) {
+  function tick() {
+    resizeCanvasToViewport(game.canvas, game.ctx, game.viewport);
+
+    const now = performance.now();
+    const dt = dtFromMs(now, game.state.lastMs);
+    game.state.lastMs = now;
+
+    if (game.state.hitFlash > 0) game.state.hitFlash = Math.max(0, game.state.hitFlash - dt);
+    if (game.state.damageT > 0) game.state.damageT = Math.max(0, game.state.damageT - dt);
+    if (game.state.wallBumpT > 0) game.state.wallBumpT = Math.max(0, game.state.wallBumpT - dt);
+
+    if (game.state.running && !game.state.paused && !game.state.gameOver) {
+      update(dt, game);
+    }
+
+    renderFrame(game);
+    requestAnimationFrame(tick);
+  }
+
+  requestAnimationFrame(tick);
+}
+
+function update(dt, game) {
+  const s = game.state;
+  s.t += dt;
+
+  // wave system (spawns + boss)
+  updateWaves(dt, game);
+
+  // player movement
+  const usingAnalog = !!game.input?.joy?.active;
+  const mx = usingAnalog
+    ? (game.input.ax || 0)
+    : (game.input.right ? 1 : 0) - (game.input.left ? 1 : 0);
+  const my = usingAnalog
+    ? (game.input.ay || 0)
+    : (game.input.down ? 1 : 0) - (game.input.up ? 1 : 0);
+  const mv = norm(mx, my);
+  const mag = clamp(mv.l, 0, 1);
+
+  // biome effects at player position
+  const pc = worldToCell(game.player.x, game.player.y);
+  const tile = sampleTile(game.selectedMapId, pc.cx, pc.cy);
+  const isIce = tile.biome === "ice";
+  const isMud = tile.biome === "mud";
+
+  const baseSp = game.player.speed * game.player.buffs.moveSpeedMul * (isMud ? 0.72 : 1);
+
+  if (isIce) {
+    // slippery inertia
+    const accel = 920;
+    const maxV = baseSp * 1.15;
+    const targetVx = (mx !== 0 || my !== 0) ? mv.x * maxV * mag : 0;
+    const targetVy = (mx !== 0 || my !== 0) ? mv.y * maxV * mag : 0;
+    // move velocity towards target
+    game.player.vx += clamp(targetVx - game.player.vx, -accel * dt, accel * dt);
+    game.player.vy += clamp(targetVy - game.player.vy, -accel * dt, accel * dt);
+    // friction
+    game.player.vx *= 1 - 0.06;
+    game.player.vy *= 1 - 0.06;
+    game.player.x += game.player.vx * dt;
+    game.player.y += game.player.vy * dt;
+  } else {
+    // classic responsive movement
+    game.player.vx = 0;
+    game.player.vy = 0;
+    if (mx !== 0 || my !== 0) {
+      game.player.x += mv.x * baseSp * mag * dt;
+      game.player.y += mv.y * baseSp * mag * dt;
+    }
+  }
+
+  // walls collision
+  {
+    const ox = game.player.x;
+    const oy = game.player.y;
+    const res = resolveCircleVsWalls({
+      mapId: game.selectedMapId,
+      x: game.player.x,
+      y: game.player.y,
+      r: game.player.r,
+    });
+    game.player.x = res.x;
+    game.player.y = res.y;
+
+    const dx = res.x - ox;
+    const dy = res.y - oy;
+    if (dx * dx + dy * dy > 0.0004) {
+      // small bonk feedback when pushed by a wall
+      s.wallBumpT = 0.12;
+      s.wallBumpX = res.x;
+      s.wallBumpY = res.y;
+    }
+  }
+
+  // camera follows player
+  const targetCamX = game.player.x - game.viewport.w * 0.5;
+  const targetCamY = game.player.y - game.viewport.h * 0.5;
+  game.camera.x += (targetCamX - game.camera.x) * clamp(dt * 10, 0, 1);
+  game.camera.y += (targetCamY - game.camera.y) * clamp(dt * 10, 0, 1);
+
+  // weapons auto-fire
+  updateWeapons(dt, game);
+
+  // enemies + bullets
+  updateEnemies(dt, game);
+  // clamp enemies against walls (simple)
+  for (let i = 0; i < game.enemies.length; i++) {
+    const e = game.enemies[i];
+    const res = resolveCircleVsWalls({ mapId: game.selectedMapId, x: e.x, y: e.y, r: e.r });
+    e.x = res.x;
+    e.y = res.y;
+  }
+  updateBullets(dt, game);
+  updateEnemyBullets(dt, game);
+
+  // pickups: lifetime + pickup radius
+  for (let i = game.pickups.length - 1; i >= 0; i--) {
+    const p = game.pickups[i];
+    p.ttl -= dt;
+    if (p.ttl <= 0) {
+      game.pickups.splice(i, 1);
+      continue;
+    }
+    const rr = 14;
+    if (len2(p.x - game.player.x, p.y - game.player.y) <= rr * rr) {
+      applyPickup(game, p);
+      game.pickups.splice(i, 1);
+    }
+  }
+
+  // floats
+  for (let i = game.floats.length - 1; i >= 0; i--) {
+    const f = game.floats[i];
+    f.ttl -= dt;
+    f.y -= 18 * dt;
+    if (f.ttl <= 0) game.floats.splice(i, 1);
+  }
+
+  // keep pressure even if player is too safe early: ensure at least a few enemies
+  if (game.enemies.length < 3 && !s.bossAlive) {
+    if (Math.random() < 0.05) spawnEnemyAtEdge(game, "walker");
+  }
+}
+

@@ -1,0 +1,19 @@
+{
+  "name": "grainfall-ascii",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Grainfall: mini jeu type survivor.io en noir & blanc style ASCII, jouable au clavier. Dev via Gulp, build statique via dist/.",
+  "scripts": {
+    "dev": "gulp dev",
+    "build": "gulp build",
+    "serve:dist": "gulp serveDist"
+  },
+  "devDependencies": {
+    "browser-sync": "^3.0.4",
+    "del": "^7.1.0",
+    "esbuild": "^0.25.0",
+    "gulp": "^4.0.2",
+    "gulp-plumber": "^1.2.1"
+  }
+}
+

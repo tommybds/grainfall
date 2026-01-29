@@ -61,6 +61,14 @@ function drawEntityChar(ctx, sx, sy, ch, alpha = 1) {
   ctx.globalAlpha = 1;
 }
 
+function drawEntityCharScaled(ctx, sx, sy, ch, scale = 1, alpha = 1) {
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.scale(scale, scale);
+  drawEntityChar(ctx, 0, 0, ch, alpha);
+  ctx.restore();
+}
+
 function drawRotatedChar(ctx, x, y, ch, angleRad, alpha = 1) {
   ctx.save();
   ctx.translate(x, y);
@@ -354,7 +362,10 @@ export function renderFrame(game) {
     const sy = e.y - camera.y;
     if (sx < -80 || sy < -80 || sx > viewport.w + 80 || sy > viewport.h + 80) continue;
 
-    drawSoftDisc(ctx, sx, sy, e.isBoss ? 40 : 22, e.isBoss ? 0.12 : 0.09);
+    const elite = e.isBoss || e.kind === "tank" || e.kind === "spitter" || e.kind === "shield" || e.kind === "summoner";
+    const discR = e.isBoss ? 56 : elite ? 30 : 22;
+    const discA = e.isBoss ? 0.14 : elite ? 0.11 : 0.09;
+    drawSoftDisc(ctx, sx, sy, discR, discA);
     ctx.fillStyle = theme.fg || CFG.fg; // restore (halo uses gradients)
     let ch = "x";
     if (e.kind === "fast") ch = ">";
@@ -368,7 +379,8 @@ export function renderFrame(game) {
       const bt = e.bossType || "summoner";
       ch = bt === "titan" ? "T" : bt === "rager" ? "R" : bt === "artillery" ? "A" : "@";
     }
-    drawEntityChar(ctx, sx, sy, ch, e.isBoss ? 1 : 0.95);
+    const glyphScale = e.isBoss ? 1.55 : elite ? 1.22 : 1;
+    drawEntityCharScaled(ctx, sx, sy, ch, glyphScale, e.isBoss ? 1 : 0.95);
 
     // Telegraphed spitter shot (small "!" above)
     if (e.kind === "spitter" && (e.windT || 0) > 0) {
@@ -395,13 +407,12 @@ export function renderFrame(game) {
     }
 
     // hp bar above elites/boss
-    const elite = e.isBoss || e.kind === "tank" || e.kind === "spitter" || e.kind === "shield" || e.kind === "summoner";
     if (elite && (e.hpMax || 0) > 0) {
       const pct = clamp(e.hp / e.hpMax, 0, 1);
-      const w = e.isBoss ? 48 : 34;
-      const h = 6;
+      const w = e.isBoss ? 60 : 40;
+      const h = e.isBoss ? 8 : 7;
       const x0 = sx - w * 0.5;
-      const y0 = sy - (e.isBoss ? 28 : 20);
+      const y0 = sy - (e.isBoss ? 36 : 26);
       ctx.save();
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 0.75;
@@ -413,15 +424,15 @@ export function renderFrame(game) {
       ctx.restore();
     }
 
-    // small boss hp bar
+    // boss hp bar
     if (e.isBoss) {
       const pct = clamp(e.hp / (e.hpMax || 1), 0, 1);
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = 0.65;
       ctx.strokeStyle = "rgba(242,242,242,0.35)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(20, 20, viewport.w - 40, 10);
+      ctx.strokeRect(20, 20, viewport.w - 40, 12);
       ctx.fillStyle = "rgba(242,242,242,0.55)";
-      ctx.fillRect(20, 20, (viewport.w - 40) * pct, 10);
+      ctx.fillRect(20, 20, (viewport.w - 40) * pct, 12);
       ctx.globalAlpha = 1;
     }
   }
@@ -616,6 +627,7 @@ export function renderFrame(game) {
   const wmm = Math.floor(waveLeft / 60);
   const wss = Math.floor(waveLeft % 60);
   const waveLeftStr = `${wmm}:${String(wss).padStart(2, "0")}`;
+  const timeStr = formatTimeMMSS(state.t || 0);
   const extra = [];
   if (state.nextBossIn !== undefined && state.nextBossIn <= 12 && !state.bossAlive) {
     extra.push(`<span>BOSS <span class="v">${Math.ceil(state.nextBossIn)}s</span></span>`);
@@ -642,6 +654,7 @@ export function renderFrame(game) {
     `<span>KILLS <span class="v">${state.kills}</span></span>`,
     `<span>WAVE <span class="v">${state.wave}</span></span>`,
     `<span>T- <span class="v">${waveLeftStr}</span></span>`,
+    `<span>T <span class="v">${timeStr}</span></span>`,
     `<span>BEST <span class="v">${game.highScore?.bestKills ?? 0}</span></span>`,
     ...extra,
   ].join("");

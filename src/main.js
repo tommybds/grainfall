@@ -65,9 +65,10 @@ const DEFAULT_SETTINGS = {
   musicScoreId: MUSIC_SCORE_IDS[0] || "a_minor_chill",
   musicVol: 0.85,
   sfxVol: 0.85,
+  autoUpgrade: false,
 };
 
-/** @type {{muted:boolean, musicMode:boolean, musicScoreChoice:string, musicScoreId:string, musicVol:number, sfxVol:number}} */
+/** @type {{muted:boolean, musicMode:boolean, musicScoreChoice:string, musicScoreId:string, musicVol:number, sfxVol:number, autoUpgrade:boolean}} */
 let settings = { ...DEFAULT_SETTINGS };
 
 function scoreLabel(id) {
@@ -81,6 +82,29 @@ function applySettingsToAudio() {
   if (settings.musicScoreId) game.audio?.setScore?.(settings.musicScoreId);
   game.audio?.setMusicVolume?.(settings.musicVol);
   game.audio?.setSfxVolume?.(settings.sfxVol);
+}
+
+function applyAutoUpgradeSetting() {
+  // Easy difficulty always auto-picks (forced), regardless of setting.
+  game.state.autoUpgrade = !!settings.autoUpgrade;
+}
+
+function updateAutoUpgradeButtons() {
+  const isEasy = game.selectedDifficultyId === "easy";
+  const enabled = isEasy ? true : !!settings.autoUpgrade;
+  const label = isEasy ? "AUTO UP: ON (FACILE)" : `AUTO UP: ${enabled ? "ON" : "OFF"}`;
+  const bStart = document.getElementById("btnAutoUpgradeStart");
+  const bPause = document.getElementById("btnAutoUpgradePause");
+  if (bStart) {
+    bStart.textContent = label;
+    bStart.disabled = isEasy;
+    bStart.classList.toggle("isOn", enabled);
+  }
+  if (bPause) {
+    bPause.textContent = label;
+    bPause.disabled = isEasy;
+    bPause.classList.toggle("isOn", enabled);
+  }
 }
 
 function updateMusicButtons() {
@@ -174,10 +198,12 @@ loadSignedLocal(SETTINGS_KEY, DEFAULT_SETTINGS).then((st) => {
   }
   if (!MUSIC_SCORES[settings.musicScoreId]) settings.musicScoreId = DEFAULT_SETTINGS.musicScoreId;
   applySettingsToAudio();
+  applyAutoUpgradeSetting();
   ensureMusicScoreSelectOptions();
   syncMusicScoreSelects();
   updateMusicButtons();
   syncVolumeSliders();
+  updateAutoUpgradeButtons();
   const btnSoundTop = document.getElementById("btnSoundTop");
   if (btnSoundTop) btnSoundTop.textContent = settings.muted ? "SND" : "MUTE";
 });
@@ -310,7 +336,10 @@ function updateHeroCard(heroId) {
 const diffGroup = wireGroup({
   selector: ".diffBtn",
   datasetKey: "diff",
-  applyToGame: (id) => (game.selectedDifficultyId = id),
+  applyToGame: (id) => {
+    game.selectedDifficultyId = id;
+    updateAutoUpgradeButtons();
+  },
   keys: { "4": 0, "5": 1, "6": 2 },
   enabledWhen: () => !game.state.running,
 });
@@ -587,6 +616,18 @@ document.getElementById("rngMusicVolPause")?.addEventListener("input", (e) => on
 document.getElementById("rngSfxVolStart")?.addEventListener("input", (e) => onSfxVol(e?.target?.value));
 document.getElementById("rngSfxVolPause")?.addEventListener("input", (e) => onSfxVol(e?.target?.value));
 syncVolumeSliders();
+
+// Auto-upgrade (forced on easy; optional otherwise)
+function toggleAutoUpgrade() {
+  if (game.selectedDifficultyId === "easy") return;
+  settings.autoUpgrade = !settings.autoUpgrade;
+  applyAutoUpgradeSetting();
+  updateAutoUpgradeButtons();
+  persistSettings();
+}
+document.getElementById("btnAutoUpgradeStart")?.addEventListener("click", toggleAutoUpgrade);
+document.getElementById("btnAutoUpgradePause")?.addEventListener("click", toggleAutoUpgrade);
+updateAutoUpgradeButtons();
 
 // --- Debug overlay (toggle with K) ---
 {

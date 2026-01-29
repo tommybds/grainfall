@@ -56,6 +56,11 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       upgradeRemaining: 0,
       upgradeChoices: [],
       upgradeCursor: 0,
+      // settings (from UI)
+      autoUpgrade: false,
+      // small notification shown in upgrade hint (renderer)
+      upgradeToast: "",
+      upgradeToastUntilMs: 0,
 
       // stats/achievements overlay
       statsMenu: false,
@@ -247,16 +252,26 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.paused = true;
     game.overlayEl.style.opacity = "1";
     game.overlayEl.dataset.active = "true";
+
+    // Auto-pick in easy, or when enabled in settings
+    scheduleAutoUpgradePick();
   }
 
   function chooseUpgrade(index) {
     if (!game.state.upgradeMenu) return;
+    cancelAutoUpgradePick();
     const c = game.state.upgradeChoices?.[index];
     applyUpgradeChoice(game, c);
+    if (c?.title) {
+      game.state.upgradeToast = `AUTO: ${c.title}`;
+      game.state.upgradeToastUntilMs = performance.now() + 1100;
+    }
     game.state.upgradeRemaining = Math.max(0, (game.state.upgradeRemaining || 1) - 1);
     if (game.state.upgradeRemaining > 0) {
       game.state.upgradeChoices = generateUpgradeChoices(game);
       game.state.upgradeCursor = 0;
+      // If we still have pending upgrades, auto-pick again.
+      scheduleAutoUpgradePick();
       return;
     }
     game.state.upgradeMenu = false;
@@ -265,6 +280,41 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.paused = false;
     game.overlayEl.style.opacity = "0";
     game.overlayEl.dataset.active = "false";
+  }
+
+  let autoUpTimer = 0;
+  function cancelAutoUpgradePick() {
+    if (autoUpTimer) {
+      clearTimeout(autoUpTimer);
+      autoUpTimer = 0;
+    }
+  }
+
+  function shouldAutoUpgrade() {
+    // Easy always auto-picks; other diffs rely on setting.
+    return game.selectedDifficultyId === "easy" || !!game.state.autoUpgrade;
+  }
+
+  function scheduleAutoUpgradePick() {
+    cancelAutoUpgradePick();
+    if (!game.state.upgradeMenu) return;
+    if (!shouldAutoUpgrade()) return;
+    // short delay so UI feels responsive and readable
+    autoUpTimer = window.setTimeout(() => {
+      autoUpTimer = 0;
+      if (!game.state.upgradeMenu) return;
+      if (!shouldAutoUpgrade()) return;
+      const opts = game.state.upgradeChoices || [];
+      if (!opts.length) return;
+      const pick = (Math.random() * Math.min(3, opts.length)) | 0;
+      // mark toast before applying (visible even if we instantly chain)
+      const c = opts[pick];
+      if (c?.title) {
+        game.state.upgradeToast = `AUTO: ${c.title}`;
+        game.state.upgradeToastUntilMs = performance.now() + 1100;
+      }
+      chooseUpgrade(pick);
+    }, 420);
   }
 
   function createObjective() {

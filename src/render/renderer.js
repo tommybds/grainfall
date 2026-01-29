@@ -761,7 +761,11 @@ export function renderFrame(game) {
         .join(" · ");
       owned.innerHTML = `<span class="k">ARMES</span> <span class="v">${list || "-"}</span>`;
     }
-    if (h) h.textContent = `Choisis 1–3. (${Math.max(1, state.upgradeRemaining || 1)} restant)`;
+    if (h) {
+      const base = `Choisis 1–3. (${Math.max(1, state.upgradeRemaining || 1)} restant)`;
+      const toastActive = (state.upgradeToastUntilMs || 0) > performance.now() && state.upgradeToast;
+      h.textContent = toastActive ? `${state.upgradeToast} — ${base}` : base;
+    }
   }
 
   // Pause button enable/disable

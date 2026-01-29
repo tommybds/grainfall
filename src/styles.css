@@ -62,19 +62,45 @@ body {
   justify-content: flex-end;
 }
 
-.pauseBtn {
+/* --- Buttons / links (shared) --- */
+:is(.pauseBtn, .menuBtn, .mapBtn, .diffBtn, .heroBtn, .ghLink) {
   pointer-events: auto;
   font: inherit;
+  color: var(--fg);
+}
+
+:is(.pauseBtn, .menuBtn, .mapBtn, .diffBtn, .heroBtn, .ghLink):disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pauseBtn {
   font-size: 12px;
   letter-spacing: 0.12em;
   padding: 8px 10px;
   border: 1px solid rgba(255,255,255,0.16);
   background: rgba(255,255,255,0.04);
-  color: var(--fg);
 }
-.pauseBtn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+
+.links { margin-top: 10px; }
+.ghLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+}
+.ghLink:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.28);
+}
+.ghLink:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.35);
+  outline-offset: 2px;
 }
 
 .stage {
@@ -122,20 +148,8 @@ body {
   margin-bottom: 6px;
 }
 .mapList { display: grid; gap: 6px; }
-.mapBtn {
-  pointer-events: auto;
+:is(.mapBtn, .diffBtn, .heroBtn) {
   text-align: left;
-  font: inherit;
-  font-size: 13px;
-  color: var(--muted);
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.10);
-  padding: 10px 10px;
-}
-.diffBtn, .heroBtn {
-  pointer-events: auto;
-  text-align: left;
-  font: inherit;
   font-size: 13px;
   color: var(--muted);
   background: rgba(255,255,255,0.04);
@@ -146,10 +160,6 @@ body {
   color: var(--fg);
   border-color: rgba(255,255,255,0.22);
   background: rgba(255,255,255,0.08);
-}
-.mapBtn:disabled, .diffBtn:disabled, .heroBtn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 .diffBtn[aria-selected="true"], .heroBtn[aria-selected="true"] {
   color: var(--fg);
@@ -188,12 +198,9 @@ body {
   margin-bottom: 10px;
 }
 .menuBtn {
-  pointer-events: auto;
-  font: inherit;
   padding: 10px 10px;
   border: 1px solid rgba(255,255,255,0.14);
   background: rgba(255,255,255,0.06);
-  color: var(--fg);
 }
 
 .heroCard {
@@ -245,6 +252,12 @@ body {
   font-size: 11px;
   background: linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.2));
 }
+.footer .sep { margin: 0 8px; color: var(--muted2); }
+.footer .ghLink {
+  padding: 6px 8px;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+}
 code { color: var(--fg); }
 
 /* --- Mobile: prevent horizontal overflow that shifts layout (iOS/Chrome) --- */
@@ -271,7 +284,7 @@ code { color: var(--fg); }
     width: 100%;
     justify-content: initial;
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto auto auto;
     align-items: center;
     gap: 8px;
   }

@@ -2,7 +2,9 @@
 
 Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”), jouable **au clavier** et **au tactile** (mobile).
 
-- **Démo**: [survivor.tommy-bordas.fr](https://survivor.tommy-bordas.fr/)
+![Aperçu du jeu](./src/grainfall.png)
+
+- **Démo**: [grainfall.tommy-bordas.fr](https://grainfall.tommy-bordas.fr/)
 
 ## Sommaire
 

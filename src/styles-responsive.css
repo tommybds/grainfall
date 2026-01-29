@@ -35,6 +35,15 @@
     letter-spacing: 0.12em;
     inset: -1px 8px auto auto;
   }
+  .xpBar {
+    width: min(560px, 44vw);
+    height: 12px;
+  }
+  .xpText {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    inset: -1px 8px auto auto;
+  }
 }
 
 /* --- Desktop: when height is tight, hide verbose blocks (avoid scroll) --- */
@@ -88,6 +97,7 @@
   #btnPauseTop { grid-row: 2; grid-column: 2; }
   #btnDashTop { grid-row: 2; grid-column: 3; }
   .hpBar { width: 100%; }
+  .xpBar { width: 100%; }
   .pauseBtn { width: 100%; text-align: center; }
 
   /* Compact typography in topbar */

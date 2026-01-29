@@ -164,10 +164,17 @@ export function applyPickup(game, p) {
   const player = game.player;
   if (game.discoveredPickups && !game.discoveredPickups[p.kind]) {
     game.discoveredPickups[p.kind] = true;
-    const name = p.kind === "heal" ? "HEAL" : p.kind === "xp" ? "XP" : p.kind === "chest" ? "CHEST" : "BUFF";
+    const name =
+      p.kind === "heal"
+        ? "HEAL"
+        : p.kind === "xp" || p.kind === "coin"
+          ? "XP"
+          : p.kind === "chest"
+            ? "CHEST"
+            : "BUFF";
     game.floats.push({ x: player.x, y: player.y - 30, ttl: 1.4, text: `NEW: ${name}` });
   }
-  if (p.kind === "xp") {
+  if (p.kind === "xp" || p.kind === "coin") {
     game.audio?.pickup?.("xp");
     player.xp += p.value;
     // simple leveling curve

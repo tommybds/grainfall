@@ -82,7 +82,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     pickups: [],
     floats: [],
     turrets: [],
-    discoveredPickups: { xp: false, heal: false, buff: false, chest: false },
+    discoveredPickups: { xp: false, coin: false, heal: false, buff: false, chest: false },
 
     theme: mapById("classic").theme,
     selectedMapId: "classic",

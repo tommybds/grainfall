@@ -1,6 +1,6 @@
 import { clamp, len2, norm } from "../core/math.js";
 import { CFG } from "./config.js";
-import { createBullet } from "./entities.js";
+import { createBullet, createPickup } from "./entities.js";
 import { maybeDropPickup } from "./pickups.js";
 import { sampleTile, worldToCell } from "./world.js";
 import { recordKill, updateAchievements } from "./stats.js";
@@ -19,6 +19,22 @@ function killEnemy(game, idx, sourceKind) {
   game.enemies.splice(idx, 1);
   game.state.kills += 1;
   game.floats.push({ x: e.x, y: e.y - 18, ttl: 0.9, text: "+1" });
+
+  // XP coins: small pieces that must be picked up.
+  // Keep it cheap: cap coin count and avoid exceeding pickup limit.
+  if (game.pickups.length <= CFG.maxPickups - 3) {
+    const base = Math.max(1, Math.round(e.xp || 1));
+    const n = Math.max(1, Math.min(3, base));
+    const v = base / n;
+    for (let k = 0; k < n; k++) {
+      const ox = (Math.random() - 0.5) * 14;
+      const oy = (Math.random() - 0.5) * 14;
+      const p = createPickup({ x: e.x + ox, y: e.y + oy, kind: "coin", value: v });
+      p.ttl = 9.5;
+      game.pickups.push(p);
+    }
+  }
+
   maybeDropPickup(game, e.x, e.y, e);
 }
 
@@ -255,15 +271,89 @@ export function updateEnemies(dt, game) {
       }
     }
 
-    // special: boss summons
+    // --- Boss patterns (variety via e.bossType) ---
     if (e.isBoss) {
-      e.summonCd -= dt;
-      if (e.summonCd <= 0) {
-        e.summonCd = clamp(2.6 - state.wave * 0.06, 1.2, 2.6);
-        // spawn 2-4 minions near boss
-        const n = 2 + ((Math.random() * 3) | 0);
-        for (let k = 0; k < n; k++) {
-          game.spawnEnemyNear(e.x, e.y, Math.random() < 0.55 ? "fast" : "walker");
+      const bt = e.bossType || "summoner";
+
+      // Titan: slow, constant pressure (slightly faster steering, no special attack spam)
+      if (bt === "titan") {
+        // Nudge: titan is harder to kite by giving it a tiny extra steering speed.
+        e.vx *= 1.06;
+        e.vy *= 1.06;
+      }
+
+      // Rager: periodic charge dashes (boss version of charger).
+      if (bt === "rager") {
+        if ((e.chargeWindT || 0) > 0) {
+          e.chargeWindT = Math.max(0, (e.chargeWindT || 0) - dt);
+          e.vx = 0;
+          e.vy = 0;
+          if ((e.chargeWindT || 0) === 0) e.chargeT = 0.26;
+        } else if ((e.chargeT || 0) > 0) {
+          e.chargeT = Math.max(0, (e.chargeT || 0) - dt);
+          const dashSp = (e.speed * spMul) * 4.6;
+          e.vx = (e.chargeDx || toP.x) * dashSp;
+          e.vy = (e.chargeDy || toP.y) * dashSp;
+        } else {
+          e.chargeCd = (e.chargeCd || 0) - dt;
+          if ((e.chargeCd || 0) <= 0) {
+            e.chargeCd = clamp(2.3 - state.wave * 0.035, 1.1, 2.3);
+            e.chargeWindT = 0.32;
+            e.chargeDx = toP.x;
+            e.chargeDy = toP.y;
+          }
+        }
+      }
+
+      // Artillery: keeps distance, fires aimed spreads.
+      if (bt === "artillery") {
+        const dx = player.x - e.x;
+        const dy = player.y - e.y;
+        const d2 = dx * dx + dy * dy;
+        const keepAway = 210;
+        const dir = d2 < keepAway * keepAway ? norm(-dx, -dy) : toP;
+        const spd = e.speed * spMul;
+        e.vx = dir.x * spd;
+        e.vy = dir.y * spd;
+
+        e.bossCd = (e.bossCd || 0) - dt;
+        if ((e.bossCd || 0) <= 0) {
+          e.bossCd = clamp(2.1 - state.wave * 0.04, 0.95, 2.1);
+          const aim = norm(player.x - e.x, player.y - e.y);
+          const shots = 3 + (state.wave >= 18 ? 2 : state.wave >= 12 ? 1 : 0);
+          const spread = 0.18 + Math.min(0.10, state.wave * 0.004);
+          const baseAng = Math.atan2(aim.y, aim.x);
+          for (let k = 0; k < shots; k++) {
+            const t = shots === 1 ? 0 : (k / (shots - 1)) * 2 - 1; // -1..1
+            const a = baseAng + t * spread;
+            game.enemyBullets.push(
+              createBullet({
+                x: e.x,
+                y: e.y,
+                vx: Math.cos(a) * 260,
+                vy: Math.sin(a) * 260,
+                dmg: 10 + state.wave * 0.8,
+                ttl: 2.4,
+                r: 3,
+                kind: "bossShot",
+              }),
+            );
+          }
+        }
+      }
+
+      // Summoner: periodic adds (original boss behavior).
+      if (bt === "summoner") {
+        e.summonCd -= dt;
+        if (e.summonCd <= 0) {
+          e.summonCd = clamp(2.6 - state.wave * 0.06, 1.1, 2.6);
+          // spawn 2-5 minions near boss
+          const n = 2 + ((Math.random() * 4) | 0);
+          for (let k = 0; k < n; k++) {
+            const r = Math.random();
+            const kind = r < 0.55 ? "fast" : r < 0.85 ? "walker" : "charger";
+            game.spawnEnemyNear(e.x, e.y, kind);
+          }
         }
       }
     }

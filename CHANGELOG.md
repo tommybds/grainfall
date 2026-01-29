@@ -2,6 +2,14 @@
 
 Ce projet suit le format de [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) et applique (au mieux) la sémantique de versionnage.
 
+## [0.3.3] - 2026-01-29
+
+### Added
+- **Boss variés** (patterns différents) + **scaling** renforcé avec la progression.
+- **Événements** (ex: `RUSH`, `ELITES`) + **temps calmes** (`CALME`) pour rythmer la run.
+- **Pièces d’XP** sur les kills + **barre d’XP** sous la barre de HP.
+- **Auto-upgrade**: ne montre plus le menu d’améliorations.
+
 ## [0.3.0] - 2026-01-29
 
 ### Added
@@ -45,3 +53,4 @@ Ce projet suit le format de [Keep a Changelog](https://keepachangelog.com/en/1.1
 
 [0.3.0]: https://github.com/tommybds/grainfall
 [0.2.0]: https://github.com/tommybds/grainfall
+[0.3.3]: https://github.com/tommybds/grainfall

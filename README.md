@@ -30,9 +30,11 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 ## Fonctionnalités
 
 - **Survivor-like**: ennemis qui arrivent par les bords, vagues + boss
+- **Rythme**: **événements** (ex: `RUSH`, `ELITES`) + **temps calmes** (`CALME`)
 - **Tir automatique** sur l’ennemi le plus proche
 - **Progression**: XP → level up → choix d’upgrade (3 options)
-- **Objets**: XP / heal / buff / chest
+- **Progression**: **pièces d’XP** sur les kills + **barre d’XP** sous la barre de HP
+- **Objets**: XP / pièces XP / heal / buff / chest
 - **Dash** (cooldown) + upgrades associés
 - **Son / musique**: toggle **SND/MUTE** (bouton en haut)
 - **Menu** de sélection (carte / difficulté / héros)
@@ -44,7 +46,7 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 
 - **Boucle**: survivre, ramasser de l’XP, monter de niveau, optimiser ton build.
 - **Vagues**: une wave dure ~**22s**.
-- **Boss**: **toutes les 5 waves**.
+- **Boss**: **toutes les 5 waves** (plusieurs types, plus puissants en late).
 - **Objectif “léger” par run** (affiché dans le HUD): `KILL`, `SURVIVE` ou `PICK`.
   - Récompense: un **chest** apparaît près du joueur.
 
@@ -92,6 +94,7 @@ Mini jeu type *survivor.io* en **noir & blanc style ASCII** (terrain “grain”
 ### Pickups
 
 - **XP**: fait monter de niveau.
+- **Pièces XP**: petites pièces ramassables (drop sur les kills) → XP.
 - **HEAL**: rend des PV.
 - **BUFF**: déclenche un menu d’upgrade (1 choix).
 - **CHEST**: déclenche un menu d’upgrade (2 choix, souvent via boss/objectif).

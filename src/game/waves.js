@@ -10,7 +10,7 @@ export function isBossWave(wave) {
   return wave > 0 && wave % CFG.bossEvery === 0;
 }
 
-export function spawnEnemyAtEdge(game, kind) {
+export function spawnEnemyAtEdge(game, kind, extra) {
   const { viewport, camera, enemies, state } = game;
   if (enemies.length >= CFG.maxEnemies) return;
 
@@ -36,12 +36,24 @@ export function spawnEnemyAtEdge(game, kind) {
     y = cy + h * 0.5 + pad;
   }
 
-  enemies.push(createEnemy({ x, y, kind, wave: state.wave, diff: state.diff }));
+  enemies.push(createEnemy({ x, y, kind, wave: state.wave, diff: state.diff, ...(extra || {}) }));
 }
 
 export function spawnBoss(game) {
   // Spawn boss slightly off-screen
-  spawnEnemyAtEdge(game, "boss");
+  const w = game.state.wave || 1;
+  // Unlock more boss types as the run advances.
+  const pool = [
+    { item: "summoner", w: 10 },
+    { item: "rager", w: Math.max(0, w - 8) * 1.2 },
+    { item: "artillery", w: Math.max(0, w - 12) * 1.1 },
+    { item: "titan", w: Math.max(0, w - 18) * 0.9 },
+  ].filter((x) => x.w > 0);
+  // Guarantee early variety.
+  const forced = w === 5 ? "summoner" : w === 10 ? "rager" : w === 15 ? "artillery" : w === 20 ? "titan" : null;
+  const bossType = forced || pickWeighted(pool);
+  spawnEnemyAtEdge(game, "boss", { bossType });
+  game.state.bossType = bossType;
   game.state.bossAlive = true;
   game.state.bossWave = game.state.wave;
 }
@@ -75,16 +87,52 @@ export function updateWaves(dt, game) {
   // base difficulty ramp
   s.difficulty = 1 + s.wave * 0.16;
 
+  // --- Rhythm: calm windows + lightweight events ---
+  s.calmT = Math.max(0, (s.calmT || 0) - dt);
+  s.eventT = Math.max(0, (s.eventT || 0) - dt);
+  if ((s.eventT || 0) <= 0) s.eventType = "";
+
+  if (s.waveJustStarted) {
+    // Every few waves (but never on boss waves): short calm to breathe.
+    if (!isBossWave(s.wave) && s.wave >= 3 && s.wave % 4 === 0) {
+      s.calmT = 3.6;
+      game.floats.push({ x: game.player.x, y: game.player.y - 28, ttl: 1.2, text: "CALME" });
+    }
+
+    // Random events (avoid stacking with calm; scale up slowly with wave).
+    if (!isBossWave(s.wave) && (s.calmT || 0) <= 0 && s.wave >= 4 && Math.random() < Math.min(0.26, 0.10 + s.wave * 0.006)) {
+      const evPool = [
+        { item: "rush", w: 10 },
+        { item: "elites", w: Math.max(0, s.wave - 6) * 0.8 + 4 },
+      ];
+      const ev = pickWeighted(evPool);
+      s.eventType = ev;
+      s.eventT = ev === "rush" ? 8.5 : 0.9;
+      if (ev === "rush") {
+        game.floats.push({ x: game.player.x, y: game.player.y - 28, ttl: 1.35, text: "RUSH" });
+      } else if (ev === "elites") {
+        game.floats.push({ x: game.player.x, y: game.player.y - 28, ttl: 1.35, text: "ELITES" });
+        // Spawn a small elite pack immediately.
+        const n = 2 + ((Math.random() * 2) | 0);
+        for (let k = 0; k < n; k++) spawnEnemyAtEdge(game, Math.random() < 0.5 ? "tank" : "shield");
+        if (Math.random() < 0.55) spawnEnemyAtEdge(game, "charger");
+      }
+    }
+  }
+
   // boss trigger (once per boss wave)
   if (isBossWave(s.wave) && !s.bossAlive && s.bossWave !== s.wave) {
     spawnBoss(game);
-    game.floats.push({ x: game.player.x, y: game.player.y - 34, ttl: 1.6, text: "BOSS" });
+    const bt = (game.state.bossType || "").toUpperCase();
+    game.floats.push({ x: game.player.x, y: game.player.y - 34, ttl: 1.6, text: bt ? `BOSS: ${bt}` : "BOSS" });
   }
 
   // spawn pacing: slightly calmer during boss
   const bossFactor = s.bossAlive ? 0.55 : 1;
+  const calmFactor = (s.calmT || 0) > 0 ? 0.12 : 1;
+  const evFactor = s.eventType === "rush" && (s.eventT || 0) > 0 ? 1.55 : 1;
   const spawnRate =
-    Math.max(1.3, Math.min(11, 1.4 * s.difficulty)) * bossFactor * (s.diff?.spawnMul ?? 1); // enemies/s
+    Math.max(1.1, Math.min(12.5, 1.4 * s.difficulty)) * bossFactor * calmFactor * evFactor * (s.diff?.spawnMul ?? 1); // enemies/s
   s.spawnAcc += dt * spawnRate;
 
   // per-wave spawn table
@@ -105,6 +153,8 @@ export function updateWaves(dt, game) {
     const kind = pickWeighted(table);
     // Slightly randomize spawns so waves feel less uniform.
     if (s.bossAlive && Math.random() < 0.35) continue;
+    // Calm windows: let the player breathe.
+    if ((s.calmT || 0) > 0 && Math.random() < 0.92) continue;
     spawnEnemyAtEdge(game, kind);
   }
 

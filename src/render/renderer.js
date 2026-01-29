@@ -178,7 +178,7 @@ export function renderFrame(game) {
     const sx = p.x - camera.x;
     const sy = p.y - camera.y;
     if (sx < -40 || sy < -40 || sx > viewport.w + 40 || sy > viewport.h + 40) continue;
-    const ch = p.kind === "heal" ? "+" : p.kind === "xp" ? "*" : p.kind === "chest" ? "¤" : "!";
+    const ch = p.kind === "heal" ? "+" : p.kind === "xp" ? "*" : p.kind === "coin" ? "·" : p.kind === "chest" ? "¤" : "!";
 
     // draw pickup bigger + optional label for first-time discovery
     ctx.save();
@@ -191,16 +191,17 @@ export function renderFrame(game) {
     const col =
       p.kind === "heal"
         ? `rgba(${rgb.heal}, ${a})`
-        : p.kind === "xp"
+        : p.kind === "xp" || p.kind === "coin"
           ? `rgba(${rgb.xp}, ${a})`
           : p.kind === "chest"
             ? `rgba(${rgb.chest}, ${a})`
             : `rgba(${rgb.buff}, ${a})`; // buff
 
     // Halo + glyph
-    drawSoftDisc(ctx, sx, sy, 14 + pulse * 10, 0.16 * pulse);
+    const isCoin = p.kind === "coin";
+    drawSoftDisc(ctx, sx, sy, (isCoin ? 6 : 14) + pulse * (isCoin ? 3 : 10), (isCoin ? 0.08 : 0.16) * pulse);
     ctx.fillStyle = col;
-    ctx.font = `${CFG.fontSize + 10 + pulse * 3}px ${CFG.fontFamily}`;
+    ctx.font = `${CFG.fontSize + (isCoin ? 2 : 10) + pulse * (isCoin ? 1 : 3)}px ${CFG.fontFamily}`;
     drawEntityChar(ctx, sx, sy, ch, 1);
     ctx.restore();
 
@@ -210,7 +211,13 @@ export function renderFrame(game) {
       ctx.fillStyle = rgba(theme.fg || CFG.fg, 0.85);
       ctx.font = `12px ${CFG.fontFamily}`;
       const label =
-        p.kind === "heal" ? "HEAL" : p.kind === "xp" ? "XP" : p.kind === "chest" ? "CHEST" : "BUFF";
+        p.kind === "heal"
+          ? "HEAL"
+          : p.kind === "xp" || p.kind === "coin"
+            ? "XP"
+            : p.kind === "chest"
+              ? "CHEST"
+              : "BUFF";
       ctx.fillText(label, sx, sy - 18);
       ctx.restore();
     }
@@ -353,7 +360,10 @@ export function renderFrame(game) {
     else if (e.kind === "charger") ch = "}";
     else if (e.kind === "exploder") ch = "*";
     else if (e.kind === "summoner") ch = "M";
-    else if (e.isBoss) ch = "@";
+    else if (e.isBoss) {
+      const bt = e.bossType || "summoner";
+      ch = bt === "titan" ? "T" : bt === "rager" ? "R" : bt === "artillery" ? "A" : "@";
+    }
     drawEntityChar(ctx, sx, sy, ch, e.isBoss ? 1 : 0.95);
 
     // Telegraphed spitter shot (small "!" above)
@@ -368,8 +378,8 @@ export function renderFrame(game) {
       ctx.restore();
     }
 
-    // Telegraphed charger dash
-    if (e.kind === "charger" && (e.chargeWindT || 0) > 0) {
+    // Telegraphed charger dash (+ boss rager dash)
+    if ((e.kind === "charger" || (e.isBoss && e.bossType === "rager")) && (e.chargeWindT || 0) > 0) {
       ctx.save();
       ctx.shadowBlur = 0;
       const t = clamp((e.chargeWindT || 0) / 0.28, 0, 1);
@@ -552,6 +562,19 @@ export function renderFrame(game) {
   if (hpFill) hpFill.style.transform = `scaleX(${hpRatio})`;
   if (hpText) hpText.textContent = `HP ${Math.round(player.hp || 0)}/${Math.round(player.hpMax || 0)}`;
 
+  // XP bar (under HP): progress to next level
+  {
+    const xpBar = document.getElementById("xpBar");
+    const xpFill = document.getElementById("xpFill");
+    const xpText = document.getElementById("xpText");
+    const lvl = player.level || 1;
+    const xpToNext = Math.round(5 + lvl * 2.2 + lvl * lvl * 0.16);
+    const xpRatio = clamp((player.xp || 0) / (xpToNext || 1), 0, 1);
+    if (xpFill) xpFill.style.transform = `scaleX(${xpRatio})`;
+    if (xpText) xpText.textContent = `XP ${Math.floor(player.xp || 0)}/${xpToNext}`;
+    if (xpBar) xpBar.style.opacity = state.running ? "1" : "0.6";
+  }
+
   // HP bar feedback (flash on change)
   {
     const now = performance.now();
@@ -592,6 +615,11 @@ export function renderFrame(game) {
   const extra = [];
   if (state.nextBossIn !== undefined && state.nextBossIn <= 12 && !state.bossAlive) {
     extra.push(`<span>BOSS <span class="v">${Math.ceil(state.nextBossIn)}s</span></span>`);
+  }
+  if ((state.calmT || 0) > 0) {
+    extra.push(`<span>CALME <span class="v">${Math.ceil(state.calmT || 0)}s</span></span>`);
+  } else if (state.eventType && (state.eventT || 0) > 0) {
+    extra.push(`<span>${String(state.eventType).toUpperCase()} <span class="v">${Math.ceil(state.eventT || 0)}s</span></span>`);
   }
   if (state.objective && !state.objective.done) {
     extra.push(

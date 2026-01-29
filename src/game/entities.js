@@ -75,7 +75,7 @@ export function createPickup({ x, y, kind, value = 1 }) {
   return { x, y, kind, value, ttl: 16 };
 }
 
-export function createEnemy({ x, y, kind, wave, diff }) {
+export function createEnemy({ x, y, kind, wave, diff, bossType }) {
   const mHp = diff?.enemyHpMul ?? 1;
   const mSp = diff?.enemySpeedMul ?? 1;
   if (kind === "fast") {
@@ -213,22 +213,36 @@ export function createEnemy({ x, y, kind, wave, diff }) {
     };
   }
   if (kind === "boss") {
-    const hpMax = (520 + wave * 160) * mHp;
+    const bt = bossType || "summoner";
+    // Boss scaling: stronger later (linear + quadratic), still affected by difficulty multipliers.
+    const hpBase = 520 + wave * 200 + wave * wave * 4.2;
+    const hpMax = hpBase * mHp * (bt === "titan" ? 1.35 : bt === "rager" ? 1.05 : 1);
+    const spBase = 26 + wave * 1.0;
+    const speed = spBase * mSp * (bt === "rager" ? 1.25 : bt === "artillery" ? 0.95 : 1);
+    const dmgMul = (2.1 + wave * 0.03) * (bt === "titan" ? 1.25 : 1);
     return {
       kind,
+      bossType: bt,
       x,
       y,
       vx: 0,
       vy: 0,
-      r: 18,
+      r: bt === "titan" ? 22 : 18,
       hp: hpMax,
       hpMax,
-      speed: (26 + wave * 0.9) * mSp,
-      dmgMul: 2.0,
-      xp: 20,
+      speed,
+      dmgMul,
+      xp: 24,
       isBoss: true,
-      phase: 0,
+      // shared boss cooldowns (used by patterns in combat.js)
+      bossCd: randRange(0.8, 1.6),
       summonCd: 2.5,
+      // rager pattern
+      chargeCd: randRange(0.8, 1.6),
+      chargeWindT: 0,
+      chargeT: 0,
+      chargeDx: 0,
+      chargeDy: 0,
     };
   }
   // default walker

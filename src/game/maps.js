@@ -10,7 +10,7 @@ export const MAPS = [
       vignette: 0.55,
     },
     // very few walls, mostly open
-    tiles: { wall: 0.012, ice: 0.035, mud: 0.0 },
+    tiles: { wall: 0.012, ice: 0.035 },
   },
   {
     id: "plains",
@@ -24,7 +24,7 @@ export const MAPS = [
       vignette: 0.42,
     },
     // no walls in plains
-    tiles: { wall: 0.0, ice: 0.015, mud: 0.12 },
+    tiles: { wall: 0.0, ice: 0.015 },
   },
   {
     id: "winter",
@@ -37,8 +37,8 @@ export const MAPS = [
       grain: 0.12,
       vignette: 0.58,
     },
-    // very slippery: lots of ice, no mud
-    tiles: { wall: 0.02, ice: 0.19, mud: 0.0 },
+    // very slippery: lots of ice
+    tiles: { wall: 0.02, ice: 0.19 },
   },
   {
     id: "hell",
@@ -52,7 +52,7 @@ export const MAPS = [
       vignette: 0.66,
     },
     // some walls, but not overwhelming
-    tiles: { wall: 0.045, ice: 0.09, mud: 0.0 },
+    tiles: { wall: 0.045, ice: 0.09 },
   },
 ];
 

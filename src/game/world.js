@@ -17,8 +17,9 @@ function hash01(cx, cy, salt = 0) {
 
 export function sampleTile(mapId, cx, cy) {
   const map = mapById(mapId);
-  // Default tiles should stay "neutral": no mud unless a map opts in.
-  const t = map.tiles || { wall: 0.06, ice: 0.04, mud: 0.0 };
+  // Only "ice" biome remains; mud removed.
+  const t = map.tiles || { wall: 0.06, ice: 0.04 };
+  const iceP = t.ice || 0;
 
   const rWall = hash01(cx, cy, 1);
   const rBiome = hash01(cx, cy, 2);
@@ -36,15 +37,19 @@ export function sampleTile(mapId, cx, cy) {
     return { wall: true, biome: "normal", glyph: g };
   }
 
-  // biomes: ice or mud (mutually exclusive)
+  // Winter is full "verglas": always slippery (except safe spawn area above).
+  if (mapId === "winter") {
+    const glyph = rDetail < 0.55 ? "~" : " ";
+    return { wall: false, biome: "ice", glyph };
+  }
+
+  // biome: ice (otherwise normal)
   let biome = "normal";
-  if (rBiome < t.ice) biome = "ice";
-  else if (rBiome < t.ice + t.mud) biome = "mud";
+  if (rBiome < iceP) biome = "ice";
 
   // subtle biome hint glyphs (sparse)
   let glyph = " ";
   if (biome === "ice" && rDetail < 0.25) glyph = "~";
-  if (biome === "mud" && rDetail < 0.25) glyph = "_";
 
   return { wall: false, biome, glyph };
 }

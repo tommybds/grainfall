@@ -2,6 +2,61 @@ import { clamp, len2, norm } from "../core/math.js";
 import { CFG } from "./config.js";
 import { createBullet } from "./entities.js";
 import { maybeDropPickup } from "./pickups.js";
+import { sampleTile, worldToCell } from "./world.js";
+
+function bulletHitWall(mapId, x, y) {
+  const c = worldToCell(x, y);
+  return sampleTile(mapId, c.cx, c.cy).wall;
+}
+
+function bounceOrDestroyBullet({
+  bullet,
+  prevX,
+  prevY,
+  mapId,
+  ricochetChance = 0.35,
+  dampMin = 0.72,
+  dampMax = 0.90,
+}) {
+  if (!bulletHitWall(mapId, bullet.x, bullet.y)) return "none";
+
+  // Usually destroy; sometimes ricochet.
+  if (Math.random() > ricochetChance) return "destroy";
+
+  // Bounce based on which grid cell we entered from.
+  const c0 = worldToCell(prevX, prevY);
+  const c1 = worldToCell(bullet.x, bullet.y);
+  const dx = c1.cx - c0.cx;
+  const dy = c1.cy - c0.cy;
+
+  // Place bullet back outside the wall to avoid getting stuck inside it.
+  bullet.x = prevX;
+  bullet.y = prevY;
+
+  const damp = dampMin + Math.random() * (dampMax - dampMin);
+
+  if (dx !== 0 && dy === 0) {
+    bullet.vx *= -damp;
+    bullet.vy *= damp;
+  } else if (dy !== 0 && dx === 0) {
+    bullet.vy *= -damp;
+    bullet.vx *= damp;
+  } else if (dx !== 0 && dy !== 0) {
+    // Corner / big dt: bounce on the dominant axis (or random tie-breaker)
+    if (Math.abs(bullet.vx) > Math.abs(bullet.vy)) bullet.vx *= -damp;
+    else if (Math.abs(bullet.vy) > Math.abs(bullet.vx)) bullet.vy *= -damp;
+    else (Math.random() < 0.5 ? (bullet.vx *= -damp) : (bullet.vy *= -damp));
+  } else {
+    // Same cell but inside wall (rare): flip a random axis.
+    (Math.random() < 0.5 ? (bullet.vx *= -damp) : (bullet.vy *= -damp));
+  }
+
+  // Small penalty so infinite wall-bouncing doesn't happen.
+  bullet.ttl *= 0.92;
+  if (bullet.pierce > 0) bullet.pierce = Math.max(0, bullet.pierce - 1);
+
+  return "bounce";
+}
 
 export function updateEnemies(dt, game) {
   const { enemies, player, state } = game;
@@ -74,9 +129,26 @@ export function updateBullets(dt, game) {
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.ttl -= dt;
+    const prevX = b.x;
+    const prevY = b.y;
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     if (b.ttl <= 0) {
+      bullets.splice(i, 1);
+      continue;
+    }
+
+    // Walls: mostly destroy, sometimes ricochet.
+    const wallRes = bounceOrDestroyBullet({
+      bullet: b,
+      prevX,
+      prevY,
+      mapId: game.selectedMapId,
+      ricochetChance: 0.32,
+      dampMin: 0.70,
+      dampMax: 0.88,
+    });
+    if (wallRes === "destroy") {
       bullets.splice(i, 1);
       continue;
     }
@@ -117,12 +189,21 @@ export function updateEnemyBullets(dt, game) {
   for (let i = enemyBullets.length - 1; i >= 0; i--) {
     const b = enemyBullets[i];
     b.ttl -= dt;
+    const prevX = b.x;
+    const prevY = b.y;
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     if (b.ttl <= 0) {
       enemyBullets.splice(i, 1);
       continue;
     }
+
+    // Enemy bullets are destroyed on walls (fairness/readability).
+    if (bulletHitWall(game.selectedMapId, b.x, b.y) && !bulletHitWall(game.selectedMapId, prevX, prevY)) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
     const rr = b.r + player.r;
     if (len2(b.x - player.x, b.y - player.y) <= rr * rr) {
       player.hp -= b.dmg * dmgMul;

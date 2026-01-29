@@ -57,7 +57,7 @@ export function applyPickup(game, p) {
   }
   if (p.kind === "buff") {
     game.audio?.pickup?.("buff");
-    // temporary buff
+    // buff OR weapon improvement (no UI, instant feedback)
     const which = Math.random();
     if (which < 0.34) {
       player.buffs.fireRateMul = clamp(player.buffs.fireRateMul + 0.12, 1, 2.2);
@@ -65,9 +65,12 @@ export function applyPickup(game, p) {
     } else if (which < 0.67) {
       player.buffs.dmgMul = clamp(player.buffs.dmgMul + 0.1, 1, 2.2);
       game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "DMG +" });
-    } else {
+    } else if (which < 0.9) {
       player.buffs.moveSpeedMul = clamp(player.buffs.moveSpeedMul + 0.08, 1, 1.8);
       game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "SPD +" });
+    } else {
+      // small chance: direct weapon upgrade
+      grantRandomUpgrade(game);
     }
     return;
   }
@@ -87,11 +90,25 @@ function xpToNext(level) {
 function grantRandomUpgrade(game) {
   const player = game.player;
   const options = ["pistol", "shotgun", "lance"];
-  const id = options[(Math.random() * options.length) | 0];
 
-  // chance to unlock new weapon if not present, else upgrade
+  // Prefer upgrading existing weapons (feels like "build" progress),
+  // but still allow unlocking missing ones.
+  const owned = options.filter((id) => player.weapons.some((w) => w.id === id));
+  const missing = options.filter((id) => !player.weapons.some((w) => w.id === id));
+
+  const roll = Math.random();
+  const id =
+    owned.length && (roll < 0.7 || !missing.length)
+      ? owned[(Math.random() * owned.length) | 0]
+      : missing[(Math.random() * missing.length) | 0];
+
   const has = player.weapons.some((w) => w.id === id);
   const w = has ? upgradeWeapon(player, id) : ensureWeapon(player, id);
-  game.floats.push({ x: player.x, y: player.y - 22, ttl: 1.25, text: `${weaponName(w.id)} ${has ? "UP" : "UNLOCK"}` });
+  game.floats.push({
+    x: player.x,
+    y: player.y - 22,
+    ttl: 1.25,
+    text: `${weaponName(w.id)} ${has ? "UP" : "UNLOCK"}`,
+  });
 }
 

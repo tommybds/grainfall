@@ -245,9 +245,8 @@ function update(dt, game) {
   const pc = worldToCell(game.player.x, game.player.y);
   const tile = sampleTile(game.selectedMapId, pc.cx, pc.cy);
   const isIce = tile.biome === "ice";
-  const isMud = tile.biome === "mud";
 
-  const baseSp = game.player.speed * game.player.buffs.moveSpeedMul * (isMud ? 0.72 : 1);
+  const baseSp = game.player.speed * game.player.buffs.moveSpeedMul;
 
   if (isIce) {
     // slippery inertia

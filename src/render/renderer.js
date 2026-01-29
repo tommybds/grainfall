@@ -161,14 +161,31 @@ export function renderFrame(game) {
 
     // draw pickup bigger + optional label for first-time discovery
     ctx.save();
-    ctx.font = `${CFG.fontSize + 10}px ${CFG.fontFamily}`;
+    const t = state.t || 0;
+    const pulse = 0.82 + 0.18 * Math.sin(t * 6 + i * 0.9);
+    const a = 0.65 + 0.35 * pulse;
+
+    // Inject a bit of color only for pickups (readability), keep world monochrome.
+    const col =
+      p.kind === "heal"
+        ? `rgba(60, 255, 160, ${a})`
+        : p.kind === "xp"
+          ? `rgba(90, 210, 255, ${a})`
+          : p.kind === "chest"
+            ? `rgba(255, 210, 90, ${a})`
+            : `rgba(210, 120, 255, ${a})`; // buff
+
+    // Halo + glyph
+    drawSoftDisc(ctx, sx, sy, 14 + pulse * 10, 0.16 * pulse);
+    ctx.fillStyle = col;
+    ctx.font = `${CFG.fontSize + 10 + pulse * 3}px ${CFG.fontFamily}`;
     drawEntityChar(ctx, sx, sy, ch, 1);
     ctx.restore();
 
     if (game.discoveredPickups && !game.discoveredPickups[p.kind]) {
       ctx.save();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = rgba(theme.fg || CFG.fg, 0.7);
+      ctx.fillStyle = rgba(theme.fg || CFG.fg, 0.85);
       ctx.font = `12px ${CFG.fontFamily}`;
       const label =
         p.kind === "heal" ? "HEAL" : p.kind === "xp" ? "XP" : p.kind === "chest" ? "CHEST" : "BUFF";

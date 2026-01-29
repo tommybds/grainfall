@@ -570,8 +570,17 @@ function update(dt, game) {
   // camera follows player
   const targetCamX = game.player.x - game.viewport.w * 0.5;
   const targetCamY = game.player.y - game.viewport.h * 0.5;
-  game.camera.x += (targetCamX - game.camera.x) * clamp(dt * 10, 0, 1);
-  game.camera.y += (targetCamY - game.camera.y) * clamp(dt * 10, 0, 1);
+  // On wide screens, camera smoothing becomes noticeable (player not perfectly centered).
+  // Snap to center for big viewports; keep smoothing on smaller screens.
+  const isWide = (game.viewport.w || 0) >= 900 || (game.viewport.h || 0) >= 600;
+  if (isWide) {
+    game.camera.x = targetCamX;
+    game.camera.y = targetCamY;
+  } else {
+    const k = clamp(dt * 12, 0, 1);
+    game.camera.x += (targetCamX - game.camera.x) * k;
+    game.camera.y += (targetCamY - game.camera.y) * k;
+  }
 
   // weapons auto-fire
   updateWeapons(dt, game);

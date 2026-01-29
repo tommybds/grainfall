@@ -52,9 +52,7 @@ function copyHtmlProd() {
         s.replace(
           /<script\s+src="\.\/main\.js"\s+type="module"><\/script>/g,
           '<script src="./assets/bundle.js" defer></script>',
-        )
-        // Remove build footer in production output
-        .replace(/<footer class="footer">[\s\S]*?<\/footer>\s*/m, "");
+        );
 
       // Vinyl file from gulp.src()
       if (file && typeof file.isBuffer === "function" && file.isBuffer()) {

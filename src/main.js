@@ -194,5 +194,8 @@ btnSoundTop?.addEventListener("click", () => {
   btnSoundTop.textContent = next ? "SND" : "MUTE";
 });
 
+const btnDashTop = document.getElementById("btnDashTop");
+btnDashTop?.addEventListener("click", () => game.requestDash?.());
+
 // Note: initial selection is taken from aria-selected="true" in the HTML buttons.
 updateHeroCard(game.selectedHeroId);

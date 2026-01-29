@@ -30,6 +30,18 @@ export function sampleTile(mapId, cx, cy) {
     return { wall: false, biome: "normal", glyph: " " };
   }
 
+  // Light "designed" walls for Hell: diagonal stripes with deterministic gaps.
+  if (mapId === "hell") {
+    const stripe = ((cx + cy) % 17 + 17) % 17;
+    if (stripe === 0) {
+      // keep some gaps to avoid hard locks
+      if (rDetail > 0.22) {
+        const g = rDetail < 0.7 ? "#" : "+";
+        return { wall: true, biome: "normal", glyph: g };
+      }
+    }
+  }
+
   const wall = rWall < t.wall;
   if (wall) {
     // keep wall glyph "thin" to avoid overwhelming the scene

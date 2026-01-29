@@ -51,11 +51,19 @@ function copyHtmlProd() {
   const replace = new Transform({
     objectMode: true,
     transform(file, _enc, cb) {
-      const rewrite = (s) =>
-        s.replace(
+      const rewrite = (s) => {
+        // Use bundled JS in prod
+        let out = s.replace(
           /<script\s+src="\.\/main\.js"\s+type="module"><\/script>/g,
           '<script src="./assets/bundle.js" defer></script>',
         );
+
+        // Inject version from package.json into the HTML (so it's visible even before JS runs)
+        const v = `v${pkg.version}`;
+        out = out.replace(/(<div class="menuVersion"\s+id="menuVersion">)[^<]*(<\/div>)/g, `$1${v}$2`);
+        out = out.replace(/(<span class="version"\s+id="appVersion">)[^<]*(<\/span>)/g, `$1${v}$2`);
+        return out;
+      };
 
       // Vinyl file from gulp.src()
       if (file && typeof file.isBuffer === "function" && file.isBuffer()) {

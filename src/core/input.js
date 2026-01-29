@@ -48,6 +48,7 @@ export function attachInputListeners({
   onTogglePause,
   onRestart,
   onStart,
+  onDash,
 }) {
   function onKeyDown(e) {
     const code = e.code;
@@ -77,6 +78,13 @@ export function attachInputListeners({
     if (key === "Enter") {
       onStart?.();
       e.preventDefault();
+      return;
+    }
+
+    if (code === "Space" || code === "ShiftLeft" || code === "ShiftRight") {
+      onDash?.();
+      e.preventDefault();
+      return;
     }
   }
 

@@ -11,6 +11,8 @@ export function createPlayer(hero) {
     y: 0,
     vx: 0,
     vy: 0,
+    lastMoveX: 1,
+    lastMoveY: 0,
     r: 8,
     hp: hero?.hpMax ?? 100,
     hpMax: hero?.hpMax ?? 100,
@@ -32,6 +34,9 @@ export function createPlayer(hero) {
       dmgMul: hero?.buffs?.dmgMul ?? 1,
       // gameplay perks (small, stackable)
       ricochetChanceAdd: 0, // added to base wall ricochet chance
+      magnetMul: 1,
+      dashCdMul: 1,
+      dashPowMul: 1,
     },
   };
   // apply start weapons
@@ -42,8 +47,21 @@ export function createPlayer(hero) {
   return p;
 }
 
-export function createBullet({ x, y, vx, vy, dmg, ttl = 1.1, r = 3, pierce = 0 }) {
-  return { x, y, vx, vy, dmg, ttl, r, pierce };
+export function createBullet({
+  x,
+  y,
+  vx,
+  vy,
+  dmg,
+  ttl = 1.1,
+  r = 3,
+  pierce = 0,
+  knock = 0,
+  bleedDps = 0,
+  bleedT = 0,
+  kind = "bullet",
+}) {
+  return { x, y, vx, vy, dmg, ttl, r, pierce, knock, bleedDps, bleedT, kind };
 }
 
 export function createPickup({ x, y, kind, value = 1 }) {

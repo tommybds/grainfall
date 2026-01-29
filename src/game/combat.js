@@ -54,6 +54,8 @@ function bounceOrDestroyBullet({
   // Small penalty so infinite wall-bouncing doesn't happen.
   bullet.ttl *= 0.92;
   if (bullet.pierce > 0) bullet.pierce = Math.max(0, bullet.pierce - 1);
+  // Synergy: ricochet makes the bullet a bit stronger.
+  bullet.dmg *= 1.08;
 
   return "bounce";
 }
@@ -65,6 +67,19 @@ export function updateEnemies(dt, game) {
 
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
+    // Bleed / DOT
+    if ((e.bleedT || 0) > 0) {
+      e.bleedT = Math.max(0, e.bleedT - dt);
+      e.hp -= (e.bleedDps || 0) * dt;
+      if (e.hp <= 0) {
+        game.audio?.explode?.(!!e.isBoss);
+        enemies.splice(i, 1);
+        game.state.kills += 1;
+        game.floats.push({ x: e.x, y: e.y - 18, ttl: 0.9, text: "+1" });
+        maybeDropPickup(game, e.x, e.y, e);
+        continue;
+      }
+    }
     const toP = norm(player.x - e.x, player.y - e.y);
     const spd = e.speed * spMul;
     e.vx = toP.x * spd;
@@ -87,6 +102,7 @@ export function updateEnemies(dt, game) {
               dmg: e.windDmg || (9 + state.wave * 0.6),
               ttl: 2.1,
               r: 3,
+              kind: "spit",
             }),
           );
         }
@@ -171,6 +187,18 @@ export function updateBullets(dt, game) {
         e.hp -= b.dmg;
         game.audio?.hit?.(false);
         game.floats.push({ x: e.x, y: e.y - 12, ttl: 0.8, text: `-${Math.round(b.dmg)}` });
+
+        // Knockback (shotgun)
+        if ((b.knock || 0) > 0) {
+          const dv = norm(b.vx || 0, b.vy || 0);
+          e.x += dv.x * (b.knock || 0) * 0.08;
+          e.y += dv.y * (b.knock || 0) * 0.08;
+        }
+        // Bleed (lance)
+        if ((b.bleedT || 0) > 0 && (b.bleedDps || 0) > 0) {
+          e.bleedT = Math.max(e.bleedT || 0, b.bleedT || 0);
+          e.bleedDps = Math.max(e.bleedDps || 0, b.bleedDps || 0);
+        }
 
         if (b.pierce > 0) {
           b.pierce -= 1;

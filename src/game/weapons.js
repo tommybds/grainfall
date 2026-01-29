@@ -16,7 +16,7 @@ function nearestEnemy(enemies, px, py) {
   return best;
 }
 
-function shoot(game, { tx, ty, speed, dmg, spread = 0, pierce = 0, ttl = 1.1 }) {
+function shoot(game, { tx, ty, speed, dmg, spread = 0, pierce = 0, ttl = 1.1, knock = 0, bleedDps = 0, bleedT = 0, kind }) {
   if (game.bullets.length >= CFG.maxBullets) return;
   const dir = norm(tx - game.player.x, ty - game.player.y);
   const a = spread ? (Math.random() - 0.5) * spread : 0;
@@ -33,6 +33,10 @@ function shoot(game, { tx, ty, speed, dmg, spread = 0, pierce = 0, ttl = 1.1 }) 
       dmg,
       ttl,
       pierce,
+      knock,
+      bleedDps,
+      bleedT,
+      kind: kind || "bullet",
     }),
   );
 }
@@ -81,10 +85,10 @@ export function updateWeapons(dt, game) {
       // Level milestones: extra shots
       const shots = 1 + (w.lvl >= 4 ? 1 : 0) + (w.lvl >= 7 ? 1 : 0);
       if (shots === 1) {
-        shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.12 });
+        shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.12, kind: "pistol" });
       } else {
         for (let s = 0; s < shots; s++) {
-          shoot(game, { tx: target.x, ty: target.y, speed, dmg: dmg * 0.8, spread: 0.18 });
+          shoot(game, { tx: target.x, ty: target.y, speed, dmg: dmg * 0.8, spread: 0.18, kind: "pistol" });
         }
       }
       w.cd = 1 / rate;
@@ -99,7 +103,7 @@ export function updateWeapons(dt, game) {
       const spread = w.lvl >= 5 ? 0.62 : 0.75;
       game.audio?.shoot?.("shotgun");
       for (let p = 0; p < pellets; p++) {
-        shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread });
+        shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread, knock: 22 + w.lvl * 3, kind: "shotgun" });
       }
       w.cd = 1 / rate;
       continue;
@@ -113,7 +117,7 @@ export function updateWeapons(dt, game) {
       game.audio?.shoot?.("lance");
       const pierce = 2 + Math.floor((w.lvl - 1) / 2);
       const ttl = 1.2 + w.lvl * 0.03;
-      shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.06, pierce, ttl });
+      shoot(game, { tx: target.x, ty: target.y, speed, dmg, spread: 0.06, pierce, ttl, bleedDps: 6 + w.lvl * 2, bleedT: 1.6, kind: "lance" });
       w.cd = 1 / rate;
       continue;
     }

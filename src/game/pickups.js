@@ -40,6 +40,8 @@ export function generateUpgradeChoices(game) {
     { key: "buff:spd", kind: "buff", id: "spd", title: "SPD +", desc: "+ vitesse" },
     { key: "perk:rico", kind: "perk", id: "rico", title: "RICOCHET +", desc: "+ chance de ricochet sur murs" },
     { key: "perk:hp", kind: "perk", id: "hp", title: "HP MAX +", desc: "+10 PV max (heal inclus)" },
+    { key: "perk:mag", kind: "perk", id: "mag", title: "MAGNET +", desc: "Attire les bonus de plus loin" },
+    { key: "perk:dash", kind: "perk", id: "dash", title: "DASH +", desc: "Dash plus souvent et plus loin" },
   ];
 
   while (choices.length < 3) {
@@ -76,6 +78,17 @@ export function applyUpgradeChoice(game, choice) {
       player.hpMax += 10;
       player.hp = clamp(player.hp + 10, 0, player.hpMax);
       game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "HP MAX +" });
+      return;
+    }
+    if (choice.id === "mag") {
+      player.buffs.magnetMul = clamp((player.buffs.magnetMul || 1) + 0.20, 1, 2.4);
+      game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "MAGNET +" });
+      return;
+    }
+    if (choice.id === "dash") {
+      player.buffs.dashCdMul = clamp((player.buffs.dashCdMul || 1) - 0.10, 0.55, 1);
+      player.buffs.dashPowMul = clamp((player.buffs.dashPowMul || 1) + 0.08, 1, 1.8);
+      game.floats.push({ x: player.x, y: player.y - 18, ttl: 1.1, text: "DASH +" });
     }
   }
 }

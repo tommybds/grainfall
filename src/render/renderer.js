@@ -201,15 +201,26 @@ export function renderFrame(game) {
     const sx = b.x - camera.x;
     const sy = b.y - camera.y;
     const a = Math.atan2(b.vy || 0, b.vx || 0);
+    const kind = b.kind || "bullet";
+    const len = kind === "lance" ? 14 : kind === "shotgun" ? 8 : 10; // pistol/bullet
+    const lw = kind === "lance" ? 3 : kind === "shotgun" ? 2.5 : 2;
+    const col =
+      kind === "pistol"
+        ? "rgba(255, 220, 90, 0.95)" // warm yellow
+        : kind === "shotgun"
+          ? "rgba(255, 140, 90, 0.95)" // orange
+          : kind === "lance"
+            ? "rgba(140, 230, 255, 0.95)" // cyan
+            : fgDim;
     ctx.save();
     ctx.translate(sx, sy);
     ctx.rotate(a);
     ctx.globalAlpha = 0.78;
     ctx.beginPath();
-    ctx.moveTo(-6, 0);
-    ctx.lineTo(6, 0);
-    ctx.strokeStyle = fgDim;
-    ctx.lineWidth = 2;
+    ctx.moveTo(-len * 0.5, 0);
+    ctx.lineTo(len * 0.5, 0);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = lw;
     ctx.stroke();
     ctx.restore();
   }
@@ -219,7 +230,7 @@ export function renderFrame(game) {
     const b = enemyBullets[i];
     const sx = b.x - camera.x;
     const sy = b.y - camera.y;
-    ctx.fillStyle = fgDim;
+    ctx.fillStyle = b.kind === "spit" ? "rgba(255, 120, 90, 0.85)" : fgDim;
     ctx.beginPath();
     ctx.arc(sx, sy, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -393,7 +404,9 @@ export function renderFrame(game) {
 
   // hit flash overlay
   if (state.hitFlash > 0) {
-    ctx.globalAlpha = clamp(state.hitFlash / 0.18, 0, 1) * 0.18;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const mul = reduce ? 0.08 : 0.18;
+    ctx.globalAlpha = clamp(state.hitFlash / 0.18, 0, 1) * mul;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, viewport.w, viewport.h);
     ctx.globalAlpha = 1;
@@ -413,6 +426,10 @@ export function renderFrame(game) {
     extra.push(
       `<span>${state.objective.label} <span class="v">${Math.min(state.objective.progress, state.objective.target)}/${state.objective.target}</span></span>`,
     );
+  }
+  if (state.running) {
+    const cd = state.dashCd || 0;
+    extra.push(`<span>DASH <span class="v">${cd > 0 ? cd.toFixed(1) : "OK"}</span></span>`);
   }
 
   hudEl.innerHTML = [
@@ -481,6 +498,8 @@ export function renderFrame(game) {
   // Pause button enable/disable
   const btnPauseTop = document.getElementById("btnPauseTop");
   if (btnPauseTop) btnPauseTop.disabled = !state.running || state.gameOver;
+  const btnDashTop = document.getElementById("btnDashTop");
+  if (btnDashTop) btnDashTop.disabled = !state.running || state.gameOver || state.paused || state.upgradeMenu;
 
   // Wall bump FX (small "bonk" flash)
   if ((state.wallBumpT || 0) > 0) {

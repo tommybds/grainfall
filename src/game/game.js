@@ -88,6 +88,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     spawnEnemyNear,
     openUpgradeMenu,
     chooseUpgrade,
+    requestDash,
   };
 
   // Slight zoom-out on small screens so you see more of the world.
@@ -188,6 +189,11 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     setPaused(!game.state.paused);
   }
 
+  function requestDash() {
+    if (!game.state.running || game.state.paused || game.state.gameOver || game.state.upgradeMenu) return;
+    game.state.dashReq = true;
+  }
+
   function openUpgradeMenu(count = 1) {
     if (!count || count <= 0) return;
     game.state.upgradeMenu = true;
@@ -244,6 +250,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     onStart: () => {
       if (!game.state.running) start();
     },
+    onDash: requestDash,
   });
 
   game.detachTouch = attachTouchJoystick({ canvas: game.canvas, viewport: game.viewport, input: game.input });
@@ -291,6 +298,27 @@ function update(dt, game) {
     : (game.input.down ? 1 : 0) - (game.input.up ? 1 : 0);
   const mv = norm(mx, my);
   const mag = clamp(mv.l, 0, 1);
+  if (mag > 0.02) {
+    game.player.lastMoveX = mv.x;
+    game.player.lastMoveY = mv.y;
+  }
+
+  // dash
+  s.dashCd = Math.max(0, (s.dashCd || 0) - dt);
+  s.dashT = Math.max(0, (s.dashT || 0) - dt);
+  if (s.dashReq) {
+    s.dashReq = false;
+    if ((s.dashCd || 0) <= 0) {
+      const dx = mag > 0.02 ? mv.x : (game.player.lastMoveX || 1);
+      const dy = mag > 0.02 ? mv.y : (game.player.lastMoveY || 0);
+      const dir = norm(dx, dy);
+      s.dashT = 0.12;
+      s.dashVx = dir.x;
+      s.dashVy = dir.y;
+      const cdBase = 1.15;
+      s.dashCd = cdBase * (game.player.buffs?.dashCdMul || 1);
+    }
+  }
 
   // biome effects at player position
   const pc = worldToCell(game.player.x, game.player.y);
@@ -299,7 +327,13 @@ function update(dt, game) {
 
   const baseSp = game.player.speed * game.player.buffs.moveSpeedMul;
 
-  if (isIce) {
+  if ((s.dashT || 0) > 0) {
+    const pow = (560 * (game.player.buffs?.dashPowMul || 1)) * (isIce ? 1.08 : 1);
+    game.player.vx = (s.dashVx || 0) * pow;
+    game.player.vy = (s.dashVy || 0) * pow;
+    game.player.x += game.player.vx * dt;
+    game.player.y += game.player.vy * dt;
+  } else if (isIce) {
     // slippery inertia
     const accel = 920;
     const maxV = baseSp * 1.15;
@@ -375,7 +409,20 @@ function update(dt, game) {
       game.pickups.splice(i, 1);
       continue;
     }
-    const rr = 14;
+    // magnet: gently pull pickups toward player
+    const magMul = game.player.buffs?.magnetMul || 1;
+    const magR = 130 * magMul;
+    const dx = game.player.x - p.x;
+    const dy = game.player.y - p.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > 0.0001 && d2 < magR * magR) {
+      const d = Math.sqrt(d2);
+      const pull = (520 * magMul) * (1 - d / magR);
+      p.x += (dx / d) * pull * dt;
+      p.y += (dy / d) * pull * dt;
+    }
+
+    const rr = 16 + 10 * (magMul - 1);
     if (len2(p.x - game.player.x, p.y - game.player.y) <= rr * rr) {
       applyPickup(game, p);
       game.pickups.splice(i, 1);

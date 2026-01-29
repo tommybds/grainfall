@@ -397,6 +397,12 @@ function update(dt, game) {
     game.audio.setIntensity(x);
   }
 
+  // Provide current weapon set to the music engine (for progressive layering).
+  if (game.audio?.setMusicMeta) {
+    const weps = (game.player?.weapons || []).map((w) => ({ id: w.id, lvl: w.lvl || 1 }));
+    game.audio.setMusicMeta({ weapons: weps });
+  }
+
   // player movement
   const usingAnalog = !!game.input?.joy?.active;
   const mx = usingAnalog

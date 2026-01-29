@@ -74,6 +74,17 @@ export function createAudio() {
 
   let sfxBus = null;
   let musicBus = null;
+  let padBus = null;
+  let padFilter = null;
+
+  // Debug counters (anti-cacophony visibility)
+  const dbg = {
+    shotAttempts: 0,
+    notesScheduled: 0,
+    dropKind: 0,
+    dropBudget: 0,
+    dropPerKind: Object.create(null),
+  };
 
   // Very small scheduler to build pads/bass over time
   const music = {
@@ -88,11 +99,18 @@ export function createAudio() {
     lastStepAny: -1,
     stepTrigCount: 0,
     lastStepByKind: Object.create(null),
+    // meta from game (weapons owned) to add layers progressively
+    meta: {
+      weapons: [],
+      mask: Object.create(null),
+      count: 0,
+    },
   };
 
   const cd = {
     shoot: 0,
-    hit: 0,
+    hitEnemy: 0,
+    hitPlayer: 0,
     pickup: 0,
     explode: 0,
   };
@@ -102,9 +120,18 @@ export function createAudio() {
     if (sfxBus && musicBus) return;
     sfxBus = ctx.createGain();
     musicBus = ctx.createGain();
+    padBus = ctx.createGain();
+    padFilter = ctx.createBiquadFilter();
+    padFilter.type = "lowpass";
+    padFilter.Q.value = 0.7;
+    padFilter.frequency.value = 900;
     sfxBus.gain.value = 1.0;
     musicBus.gain.value = 0.95;
+    padBus.gain.value = 1.0;
     sfxBus.connect(master);
+    // pad -> filter -> music bus -> master
+    padBus.connect(padFilter);
+    padFilter.connect(musicBus);
     musicBus.connect(master);
   }
 
@@ -209,7 +236,7 @@ export function createAudio() {
     }
   }
 
-  function scheduleChord(sc, t0, barDur, degree) {
+  function scheduleChord(sc, t0, barDur, degree, barIndex) {
     // Layer thresholds: pad appears first, then bass later.
     const padOn = intensity >= 0.18;
     const bassOn = intensity >= 0.48;
@@ -217,40 +244,61 @@ export function createAudio() {
 
     const scale = sc.scale || [0, 2, 3, 5, 7, 8, 10];
     const rootMidi = (sc.rootMidi || 57) + scale[degree % scale.length];
-    const thirdMidi = rootMidi + scale[2] - scale[0]; // scale degree +2
-    const fifthMidi = rootMidi + scale[4] - scale[0]; // scale degree +4
+    let thirdMidi = rootMidi + (scale[2] - scale[0]); // scale degree +2
+    let fifthMidi = rootMidi + (scale[4] - scale[0]); // scale degree +4
 
-    const padGain = 0.020 + 0.030 * intensity;
+    // Simple voicing variation so pads don't feel identical every bar.
+    const b = barIndex | 0;
+    if ((b % 8) === 4) thirdMidi += 12; // lift third on bar 5
+    if ((b % 8) === 6) fifthMidi -= 12; // drop fifth on bar 7
+
+    // Per-score pad character (timbre + filter movement).
+    const p = sc.pad || {};
+    const padType = p.type || "sine";
+    const det = typeof p.detune === "number" ? p.detune : 10;
+    const atk = typeof p.attack === "number" ? p.attack : 0.08;
+    const baseF = (typeof p.filterBase === "number" ? p.filterBase : (800 + 500 * intensity));
+    const varF = (typeof p.filterVar === "number" ? p.filterVar : 650);
+    // Slow drift per bar (keeps "âme" without becoming noisy)
+    if (padFilter) {
+      const drift = Math.sin((b || 0) * 0.55) * 0.5 + 0.5;
+      const freq = Math.max(220, baseF + varF * drift);
+      padFilter.frequency.setValueAtTime(freq, t0);
+    }
+
+    const padGain = 0.016 + 0.028 * intensity;
+    dbg.notesScheduled += 3;
     beep({
-      type: "sine",
+      type: padType,
       freq: midiToFreq(rootMidi),
       dur: barDur * 0.98,
       gain: padGain,
-      detune: -6,
-      out: musicBus,
-      attack: 0.08,
+      detune: -det,
+      out: padBus || musicBus,
+      attack: atk,
     });
     beep({
-      type: "sine",
+      type: padType,
       freq: midiToFreq(thirdMidi),
       dur: barDur * 0.98,
       gain: padGain * 0.92,
-      detune: 4,
-      out: musicBus,
-      attack: 0.08,
+      detune: det * 0.55,
+      out: padBus || musicBus,
+      attack: atk,
     });
     beep({
-      type: "sine",
+      type: padType,
       freq: midiToFreq(fifthMidi),
       dur: barDur * 0.98,
       gain: padGain * 0.85,
-      detune: 10,
-      out: musicBus,
-      attack: 0.08,
+      detune: det * 0.85,
+      out: padBus || musicBus,
+      attack: atk,
     });
 
     if (bassOn) {
       const bassGain = 0.030 + 0.040 * intensity;
+      dbg.notesScheduled += 1;
       beep({
         type: "triangle",
         freq: midiToFreq(rootMidi - 24),
@@ -265,6 +313,54 @@ export function createAudio() {
     }
   }
 
+  function hasWeapon(id) {
+    return !!music.meta.mask?.[id];
+  }
+
+  function scheduleKick(t0, gain) {
+    if (!ctx || !musicBus) return;
+    // simple synth kick: fast pitch drop sine
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(150, t0);
+    o.frequency.exponentialRampToValueAtTime(55, t0 + 0.08);
+    o.connect(g);
+    g.connect(musicBus);
+    env(g, t0, gain, 0.14, 0.004);
+    o.start(t0);
+    o.stop(t0 + 0.18);
+    dbg.notesScheduled += 1;
+  }
+
+  function scheduleSnare(t0, gain) {
+    noise({ dur: 0.030, gain, out: musicBus, attack: 0.002 });
+  }
+
+  function scheduleArp(sc, t0, kind, gainMul = 1) {
+    const scale = sc.scale || [0, 2, 3, 5, 7, 8, 10];
+    const deg = noteForWeapon(sc, kind);
+    const midi =
+      (sc.rootMidi || 57) +
+      scale[((deg % scale.length) + scale.length) % scale.length] +
+      (deg >= scale.length ? 12 : 0);
+    const g = (0.015 + 0.018 * intensity) * gainMul;
+    beep({ type: "square", freq: midiToFreq(midi), dur: 0.05, gain: g, detune: 4, out: musicBus });
+    dbg.notesScheduled += 1;
+  }
+
+  function scheduleLead(sc, t0, kind, gainMul = 1) {
+    const scale = sc.scale || [0, 2, 3, 5, 7, 8, 10];
+    const deg = noteForWeapon(sc, kind);
+    const midi =
+      (sc.rootMidi || 57) +
+      scale[((deg % scale.length) + scale.length) % scale.length] +
+      12;
+    const g = (0.016 + 0.020 * intensity) * gainMul;
+    beep({ type: "sawtooth", freq: midiToFreq(midi), dur: 0.11, gain: g, detune: -6, out: musicBus });
+    dbg.notesScheduled += 1;
+  }
+
   function scheduleMusicStep(sc, t0, step) {
     const stepsPerBar = 16;
     const bar = Math.floor(step / stepsPerBar);
@@ -272,12 +368,44 @@ export function createAudio() {
     // New bar -> chord / pad layer
     if (inBar === 0) {
       const prog = sc.chordProg || [0, 5, 3, 4];
-      const degree = prog[bar % prog.length] || 0;
-      scheduleChord(sc, t0, music.stepDur * stepsPerBar, degree);
+      let degree = prog[bar % prog.length] || 0;
+      // tiny turnaround so it doesn't feel like "same 4 bars"
+      if ((prog.length || 0) <= 4 && (bar % 8) === 7) degree = prog[(bar + 1) % prog.length] || degree;
+      scheduleChord(sc, t0, music.stepDur * stepsPerBar, degree, bar);
     }
     // Optional: subtle hi-hat when intensity is high (keeps it alive)
     if (intensity >= 0.78 && (inBar % 8 === 4)) {
       noise({ dur: 0.010, gain: 0.007 + 0.010 * intensity, out: musicBus, attack: 0.002 });
+    }
+
+    // Progressive layers based on owned weapons (decoupled from firing rate).
+    // - pistol -> arp
+    // - shotgun -> kick/snare groove
+    // - tesla/lance/laser -> lead
+    // - flame -> texture noise+short saw
+    const wc = music.meta.count || 0;
+    const arpOn = hasWeapon("pistol") && wc >= 1 && intensity >= 0.12;
+    const drumOn = hasWeapon("shotgun") && wc >= 2 && intensity >= 0.18;
+    const leadOn = (hasWeapon("tesla") || hasWeapon("lance") || hasWeapon("laser")) && wc >= 2 && intensity >= 0.28;
+    const texOn = hasWeapon("flame") && wc >= 3 && intensity >= 0.35;
+
+    // Arp on 8ths (less busy)
+    if (arpOn && (inBar % 2 === 0)) scheduleArp(sc, t0, "pistol", 1.0);
+
+    // Drums: kick on beats, snare on 2/4
+    if (drumOn) {
+      if (inBar === 0 || inBar === 8) scheduleKick(t0, 0.030 + 0.030 * intensity);
+      if (inBar === 4 || inBar === 12) scheduleSnare(t0, 0.010 + 0.010 * intensity);
+    }
+
+    // Lead on quarters
+    if (leadOn && (inBar % 4 === 0)) scheduleLead(sc, t0, "lance", 0.90);
+
+    // Texture: small bursts, very subtle
+    if (texOn && (inBar % 8 === 2)) {
+      noise({ dur: 0.020, gain: 0.006 + 0.006 * intensity, out: musicBus, attack: 0.002 });
+      beep({ type: "sawtooth", freq: midiToFreq((sc.rootMidi || 57) + 24), dur: 0.05, gain: 0.006 + 0.006 * intensity, detune: 10, out: musicBus });
+      dbg.notesScheduled += 1;
     }
   }
 
@@ -309,63 +437,9 @@ export function createAudio() {
     ensureBuses();
 
     if (mode === "music") {
-      const sc = currentScore();
-      if (!sc) return;
-      const t0 = quantizeTime(now());
-      // --- de-clutter: per-weapon + global step budget
-      const stepDur = music.stepDur || (60 / (sc.bpm || 110)) / 4;
-      const base = music.startT || t0;
-      const step = Math.floor((t0 - base) / stepDur + 1e-6);
-      // Per-kind spacing (some weapons are too "chatty" at high levels)
-      const minSteps =
-        kind === "shotgun" ? 2
-        : (kind === "lance" || kind === "laser" || kind === "tesla") ? 2
-        : 1;
-      const lastK = music.lastStepByKind[kind];
-      if (lastK !== undefined && step - lastK < minSteps) return;
-      music.lastStepByKind[kind] = step;
-
-      // Global budget per 16th (keep it musical, not a wall of notes)
-      const maxPerStep = 2;
-      if (music.lastStepAny === step) {
-        if (music.stepTrigCount >= maxPerStep) return;
-        music.stepTrigCount += 1;
-      } else {
-        music.lastStepAny = step;
-        music.stepTrigCount = 1;
-      }
-      const scale = sc.scale || [0, 2, 3, 5, 7, 8, 10];
-      const deg = noteForWeapon(sc, kind);
-      const midi = (sc.rootMidi || 57) + scale[((deg % scale.length) + scale.length) % scale.length] + (deg >= scale.length ? 12 : 0);
-      // Per-weapon gain calibration (prevents some weapons from dominating)
-      const gainMul =
-        kind === "shotgun" ? 0.70
-        : kind === "flame" ? 0.50
-        : (kind === "lance" || kind === "laser" || kind === "tesla") ? 0.85
-        : 0.75; // pistol/default
-      const baseGain = (0.020 + 0.022 * intensity) * gainMul;
-
-      // Timbre per weapon (still "midi-like")
-      if (kind === "shotgun") {
-        noise({ dur: 0.016, gain: 0.022 + 0.022 * intensity, out: musicBus, attack: 0.002 });
-        beep({ type: "square", freq: midiToFreq(midi - 12), dur: 0.07, gain: baseGain * 0.90, detune: -16, out: musicBus });
-        return;
-      }
-      if (kind === "flame") {
-        noise({ dur: 0.014, gain: 0.010 + 0.012 * intensity, out: musicBus, attack: 0.002 });
-        beep({ type: "sawtooth", freq: midiToFreq(midi), dur: 0.06, gain: baseGain * 0.55, detune: 10, out: musicBus });
-        return;
-      }
-      if (kind === "lance" || kind === "laser" || kind === "tesla") {
-        beep({ type: "sawtooth", freq: midiToFreq(midi), dur: 0.11, gain: baseGain * 0.95, detune: -8, out: musicBus });
-        // Keep harmonies rare to avoid clutter at high fire rate
-        if (intensity >= 0.80 && music.stepTrigCount === 1) {
-          beep({ type: "triangle", freq: midiToFreq(midi + 7), dur: 0.08, gain: baseGain * 0.22, detune: 6, out: musicBus });
-        }
-        return;
-      }
-      // default / pistol-like
-      beep({ type: "square", freq: midiToFreq(midi), dur: 0.050, gain: baseGain * 0.85, detune: 4, out: musicBus });
+      // Decoupled: shots do not trigger notes anymore (keeps music stable).
+      // We only track attempts for debugging.
+      dbg.shotAttempts += 1;
       return;
     }
 
@@ -389,7 +463,13 @@ export function createAudio() {
   function hit(isPlayer = false) {
     if (muted || !unlocked) return;
     // In music mode, hits are intentionally subtle and less frequent.
-    if (!can("hit", mode === "music" ? 0.09 : 0.04)) return;
+    // Also: separate cooldowns so enemy hit spam doesn't mask player feedback.
+    const key = isPlayer ? "hitPlayer" : "hitEnemy";
+    const cdSec =
+      mode === "music"
+        ? (isPlayer ? 0.11 : 0.16)
+        : 0.04;
+    if (!can(key, cdSec)) return;
     ensureCtx();
     ensureBuses();
     syncBusGains();
@@ -402,7 +482,8 @@ export function createAudio() {
         beep({ type: "sine", freq: 90, dur: 0.08, gain: 0.05, out: sfxBus });
       }
     } else {
-      noise({ dur: 0.018, gain: mode === "music" ? 0.018 : 0.05, out: sfxBus });
+      // Enemy hits: much quieter in music mode (and still readable in sfx mode).
+      noise({ dur: 0.014, gain: mode === "music" ? 0.007 : 0.05, out: sfxBus });
     }
   }
 
@@ -466,10 +547,29 @@ export function createAudio() {
     intensity = clamp01(Number(v) || 0);
   }
 
+  function setMusicMeta(meta) {
+    const weps = meta?.weapons || [];
+    music.meta.weapons = weps;
+    music.meta.count = weps.length || 0;
+    const mask = Object.create(null);
+    for (let i = 0; i < weps.length; i++) mask[weps[i]?.id] = true;
+    music.meta.mask = mask;
+  }
+
   function getDebugInfo() {
     const padOn = intensity >= 0.18;
     const bassOn = intensity >= 0.48;
     const hatOn = intensity >= 0.78;
+    const wc = music.meta.count || 0;
+    const voices = {
+      pad: padOn,
+      bass: bassOn,
+      hat: hatOn,
+      arp: hasWeapon("pistol") && wc >= 1 && intensity >= 0.12,
+      drums: hasWeapon("shotgun") && wc >= 2 && intensity >= 0.18,
+      lead: (hasWeapon("tesla") || hasWeapon("lance") || hasWeapon("laser")) && wc >= 2 && intensity >= 0.28,
+      texture: hasWeapon("flame") && wc >= 3 && intensity >= 0.35,
+    };
     return {
       mode,
       scoreId,
@@ -480,9 +580,20 @@ export function createAudio() {
         hat: hatOn,
         count: (padOn ? 1 : 0) + (bassOn ? 1 : 0) + (hatOn ? 1 : 0),
       },
+      voices,
       clock: {
         step: music.step || 0,
         stepDur: music.stepDur || 0,
+      },
+      limiter: {
+        maxPerStep: 2,
+        lastStep: music.lastStepAny,
+        stepTrigCount: music.stepTrigCount,
+        dropKind: dbg.dropKind,
+        dropBudget: dbg.dropBudget,
+        shotAttempts: dbg.shotAttempts,
+        notesScheduled: dbg.notesScheduled,
+        dropPerKind: { ...dbg.dropPerKind },
       },
     };
   }
@@ -499,6 +610,7 @@ export function createAudio() {
     setMode,
     setScore,
     setIntensity,
+    setMusicMeta,
     getDebugInfo,
     get muted() {
       return muted;

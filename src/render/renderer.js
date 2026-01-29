@@ -277,10 +277,23 @@ export function renderFrame(game) {
           ? 14
           : kind === "shotgun"
             ? 8
+            : kind === "boomerang"
+              ? 16
             : kind === "flame"
               ? 6
               : 10; // pistol/bullet
-    const lw = kind === "laser" ? 3.5 : kind === "lance" ? 3 : kind === "shotgun" ? 2.5 : kind === "flame" ? 4 : 2;
+    const lw =
+      kind === "laser"
+        ? 3.5
+        : kind === "lance"
+          ? 3
+          : kind === "shotgun"
+            ? 2.5
+            : kind === "boomerang"
+              ? 3
+              : kind === "flame"
+                ? 4
+                : 2;
     const col =
       kind === "pistol"
         ? "rgba(255, 220, 90, 0.95)" // warm yellow
@@ -290,6 +303,8 @@ export function renderFrame(game) {
             ? "rgba(140, 230, 255, 0.95)" // cyan
             : kind === "laser"
               ? "rgba(255, 90, 90, 0.95)"
+              : kind === "boomerang"
+                ? "rgba(210, 170, 255, 0.95)" // purple-ish (readable)
               : kind === "turret"
                 ? "rgba(255, 220, 90, 0.90)"
             : kind === "flame"

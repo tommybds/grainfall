@@ -41,6 +41,8 @@ function applyColorblind(enabled) {
   const label = `Daltonien: ${enabled ? "ON" : "OFF"}`;
   if (btnColorblind) btnColorblind.textContent = label;
   if (btnColorblindPause) btnColorblindPause.textContent = label;
+  btnColorblind?.classList?.toggle("isOn", !!enabled);
+  btnColorblindPause?.classList?.toggle("isOn", !!enabled);
 }
 
 try {
@@ -79,9 +81,21 @@ function applySettingsToAudio() {
 
 function updateMusicButtons() {
   const onOff = settings.musicMode ? "ON" : "OFF";
-  const tMode = `ARMES MUSICALES: ${onOff}`;
-  document.getElementById("btnMusicModeStart")?.replaceChildren(document.createTextNode(tMode));
-  document.getElementById("btnMusicModePause")?.replaceChildren(document.createTextNode(tMode));
+  const tMode = `MUSIQUE: ${onOff}`;
+  const bStart = document.getElementById("btnMusicModeStart");
+  const bPause = document.getElementById("btnMusicModePause");
+  bStart?.replaceChildren(document.createTextNode(tMode));
+  bPause?.replaceChildren(document.createTextNode(tMode));
+  bStart?.classList?.toggle("isOn", !!settings.musicMode);
+  bPause?.classList?.toggle("isOn", !!settings.musicMode);
+
+  const selStart = document.getElementById("selMusicScoreStart");
+  const selPause = document.getElementById("selMusicScorePause");
+  // When music is off, disable the selector to reduce ambiguity.
+  if (selStart) selStart.disabled = !settings.musicMode;
+  if (selPause) selPause.disabled = !settings.musicMode;
+  selStart?.classList?.toggle("isOn", !!settings.musicMode);
+  selPause?.classList?.toggle("isOn", !!settings.musicMode);
 }
 
 function pickRandomScore(exclude) {
@@ -500,7 +514,7 @@ document.getElementById("selMusicScorePause")?.addEventListener("change", (e) =>
   persistSettings();
 });
 
-// --- Debug overlay (toggle with `) ---
+// --- Debug overlay (toggle with K) ---
 {
   const debugEl = document.getElementById("debugOverlay");
   let on = false;
@@ -513,9 +527,26 @@ document.getElementById("selMusicScorePause")?.addEventListener("change", (e) =>
     const choice = settings.musicScoreChoice || "random";
     const chosen = a.scoreId ? scoreLabel(a.scoreId) : "-";
     const layers = a.layers ? `${a.layers.count} (pad:${a.layers.pad ? "1" : "0"} bass:${a.layers.bass ? "1" : "0"} hat:${a.layers.hat ? "1" : "0"})` : "-";
+    const lim = a.limiter || null;
+    const voices = a.voices
+      ? Object.entries(a.voices)
+          .filter(([, v]) => !!v)
+          .map(([k]) => k)
+          .join(", ")
+      : "-";
+    let drops = "-";
+    if (lim) {
+      const dpk = lim.dropPerKind || {};
+      const top = Object.entries(dpk)
+        .sort((aa, bb) => (bb[1] || 0) - (aa[1] || 0))
+        .slice(0, 4)
+        .map(([k, v]) => `${k}:${v}`)
+        .join("  ");
+      drops = top || "-";
+    }
     debugEl.textContent =
       [
-        `DEBUG  (toggle: \`)`,
+        `DEBUG  (toggle: K)`,
         ``,
         `run: ${s.running ? "on" : "off"}   paused: ${s.paused ? "yes" : "no"}   t: ${(s.t || 0).toFixed(1)}s`,
         `wave: ${s.wave || 1}   kills: ${s.kills || 0}   enemies: ${(game.enemies && game.enemies.length) || 0}`,
@@ -524,6 +555,11 @@ document.getElementById("selMusicScorePause")?.addEventListener("change", (e) =>
         `audio: mode=${a.mode || "-"}   muted=${game.audio?.muted ? "yes" : "no"}`,
         `music: choice=${choice}   playing=${chosen}`,
         `intensity: ${typeof a.intensity === "number" ? a.intensity.toFixed(2) : "-" }   layers: ${layers}`,
+        `voices: ${voices}`,
+        lim
+          ? `music: notes=${lim.notesScheduled}  shots=${lim.shotAttempts}   max/step=${lim.maxPerStep}  used=${lim.stepTrigCount}  drop(kind)=${lim.dropKind}  drop(budget)=${lim.dropBudget}`
+          : `limiter: -`,
+        lim ? `drops(top): ${drops}` : ``,
         ``,
         `weapons: ${weps}`,
       ].join("\n");
@@ -533,7 +569,7 @@ document.getElementById("selMusicScorePause")?.addEventListener("change", (e) =>
     window.addEventListener(
       "keydown",
       (e) => {
-        if (e.code === "Backquote") {
+        if (e.code === "KeyK") {
           on = !on;
           debugEl.hidden = !on;
           if (on) renderDebug();

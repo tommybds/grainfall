@@ -314,6 +314,11 @@ export function updateBullets(dt, game) {
       continue;
     }
 
+    // Per-bullet cooldown (prevents multi-hit spam when overlapping).
+    if (b.kind === "boomerang") {
+      b.hitCd = Math.max(0, (b.hitCd || 0) - dt);
+    }
+
     // Special bullets (not classic moving projectiles)
     if (b.kind === "laser") {
       if (!b.didHit) {
@@ -467,6 +472,9 @@ export function updateBullets(dt, game) {
       continue;
     }
 
+    // Boomerang: if we're in hit cooldown, skip collision this frame.
+    if (b.kind === "boomerang" && (b.hitCd || 0) > 0) continue;
+
     for (let j = enemies.length - 1; j >= 0; j--) {
       const e = enemies[j];
       const rr = b.r + e.r;
@@ -488,7 +496,25 @@ export function updateBullets(dt, game) {
           e.dotSourceKind = b.kind || e.dotSourceKind;
         }
 
-        if (b.pierce > 0) {
+        if (b.kind === "boomerang") {
+          // Keep boomerang alive: it should return to player instead of being destroyed on first hits.
+          b.hitCd = 0.075;
+          if ((b.pierce || 0) > 0) b.pierce -= 1;
+          // Once out of pierce, force return so it doesn't stay in the enemy pack.
+          if ((b.pierce || 0) <= 0) {
+            b.pierce = 0;
+            b.returning = true;
+            b.turnT = 0;
+            const toP = norm(game.player.x - b.x, game.player.y - b.y);
+            const sp = b.speed || 360;
+            b.vx = toP.x * sp;
+            b.vy = toP.y * sp;
+          } else {
+            // small deflect so successive hits feel like "bounces"
+            b.vx *= 0.92;
+            b.vy *= 0.92;
+          }
+        } else if (b.pierce > 0) {
           b.pierce -= 1;
           // tiny deflect
           b.vx *= 0.98;

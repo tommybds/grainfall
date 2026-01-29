@@ -257,6 +257,18 @@ body {
   outline-offset: 2px;
 }
 
+/* Make "enabled" options pop (menu readability) */
+.menuBtn.isOn,
+.menuSelect.isOn {
+  border-color: rgba(255, 211, 61, 0.85);
+  box-shadow: 0 0 0 1px rgba(255, 211, 61, 0.20), 0 16px 44px rgba(255, 211, 61, 0.10);
+  background: rgba(255, 211, 61, 0.10);
+  color: rgba(255, 245, 210, 0.98);
+}
+.menuSelect:disabled {
+  opacity: 0.55;
+}
+
 /* Debug overlay */
 .debugOverlay {
   position: absolute;

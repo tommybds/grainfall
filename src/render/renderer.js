@@ -183,22 +183,25 @@ export function renderFrame(game) {
     // draw pickup bigger + optional label for first-time discovery
     ctx.save();
     const t = state.t || 0;
-    const pulse = 0.82 + 0.18 * Math.sin(t * 6 + i * 0.9);
-    const a = 0.65 + 0.35 * pulse;
+    const isCoin = p.kind === "coin";
+    // Coins use the same pulse feel as mines (faster, snappier) and are yellow.
+    const pulse = isCoin ? 0.75 + 0.25 * Math.sin(t * 8 + i) : 0.82 + 0.18 * Math.sin(t * 6 + i * 0.9);
+    const a = isCoin ? 0.55 + 0.45 * pulse : 0.65 + 0.35 * pulse;
 
     // Inject a bit of color only for pickups (readability), keep world monochrome.
     // Palette is read from CSS vars (overridden by styles-colorblind.css when enabled).
     const col =
       p.kind === "heal"
         ? `rgba(${rgb.heal}, ${a})`
-        : p.kind === "xp" || p.kind === "coin"
-          ? `rgba(${rgb.xp}, ${a})`
+        : p.kind === "coin"
+          ? `rgba(${rgb.chest}, ${a})`
+          : p.kind === "xp"
+            ? `rgba(${rgb.xp}, ${a})`
           : p.kind === "chest"
             ? `rgba(${rgb.chest}, ${a})`
             : `rgba(${rgb.buff}, ${a})`; // buff
 
     // Halo + glyph
-    const isCoin = p.kind === "coin";
     drawSoftDisc(ctx, sx, sy, (isCoin ? 6 : 14) + pulse * (isCoin ? 3 : 10), (isCoin ? 0.08 : 0.16) * pulse);
     ctx.fillStyle = col;
     ctx.font = `${CFG.fontSize + (isCoin ? 2 : 10) + pulse * (isCoin ? 1 : 3)}px ${CFG.fontFamily}`;
@@ -237,7 +240,8 @@ export function renderFrame(game) {
       const t = state.t || 0;
       const pulse = 0.75 + 0.25 * Math.sin(t * 8 + i);
       ctx.globalAlpha = (b.armT || 0) > 0 ? 0.45 : 0.85;
-      ctx.fillStyle = `rgba(255, 210, 90, ${0.4 + 0.4 * pulse})`;
+      // Mines are red for better differentiation from XP coins (yellow).
+      ctx.fillStyle = `rgba(255, 90, 90, ${0.4 + 0.4 * pulse})`;
       ctx.beginPath();
       ctx.arc(sx, sy, 3 + pulse * 2, 0, Math.PI * 2);
       ctx.fill();

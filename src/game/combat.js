@@ -151,7 +151,11 @@ function bounceOrDestroyBullet({
 
 export function updateEnemies(dt, game) {
   const { enemies, player, state } = game;
-  const spMul = state.difficulty;
+  // Progression: prefer "more enemies" over "much faster enemies".
+  // Keep enemy movement scaling modest with wave, instead of using state.difficulty (which ramps hard).
+  const w = state.wave || 1;
+  const spMul = 1 + clamp((w - 1) * 0.018, 0, 0.75);
+  const contactMul = 1 + clamp((w - 1) * 0.03, 0, 1.4);
   const dmgMul = state.diff?.enemyDmgMul ?? 1;
 
   for (let i = enemies.length - 1; i >= 0; i--) {
@@ -377,7 +381,7 @@ export function updateEnemies(dt, game) {
         }
         continue;
       }
-      const dps = CFG.contactDpsBase * e.dmgMul * spMul * dmgMul;
+      const dps = CFG.contactDpsBase * e.dmgMul * contactMul * dmgMul;
       player.hp -= dps * dt;
       game.state.hitFlash = 0.12;
       game.state.damageAngle = Math.atan2(e.y - player.y, e.x - player.x);

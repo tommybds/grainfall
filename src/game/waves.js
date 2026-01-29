@@ -131,8 +131,13 @@ export function updateWaves(dt, game) {
   const bossFactor = s.bossAlive ? 0.55 : 1;
   const calmFactor = (s.calmT || 0) > 0 ? 0.12 : 1;
   const evFactor = s.eventType === "rush" && (s.eventT || 0) > 0 ? 1.55 : 1;
+  const spawnCap = Math.min(22, 12.5 + Math.max(0, (s.wave || 1) - 16) * 0.35);
   const spawnRate =
-    Math.max(1.1, Math.min(12.5, 1.4 * s.difficulty)) * bossFactor * calmFactor * evFactor * (s.diff?.spawnMul ?? 1); // enemies/s
+    Math.max(1.1, Math.min(spawnCap, 1.4 + (s.wave || 1) * 0.24)) *
+    bossFactor *
+    calmFactor *
+    evFactor *
+    (s.diff?.spawnMul ?? 1); // enemies/s
   s.spawnAcc += dt * spawnRate;
 
   // per-wave spawn table

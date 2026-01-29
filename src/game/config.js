@@ -9,7 +9,7 @@ export const CFG = {
   fgDim: "rgba(242,242,242,0.55)",
 
   // gameplay
-  maxEnemies: 260,
+  maxEnemies: 320,
   maxBullets: 420,
   maxPickups: 80,
   contactDpsBase: 20,

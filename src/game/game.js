@@ -244,17 +244,27 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
 
   function openUpgradeMenu(count = 1) {
     if (!count || count <= 0) return;
-    game.state.upgradeMenu = true;
+    // If auto-upgrade is enabled (or forced by difficulty), don't show the upgrade menu at all.
+    // Apply upgrades immediately so gameplay stays fluid.
+    if (shouldAutoUpgrade()) {
+      const n = Math.max(1, count | 0);
+      for (let k = 0; k < n; k++) {
+        const opts = generateUpgradeChoices(game) || [];
+        if (!opts.length) continue;
+        const pick = (Math.random() * Math.min(3, opts.length)) | 0;
+        applyUpgradeChoice(game, opts[pick]);
+      }
+      return;
+    }
+
     game.state.upgradeRemaining = Math.max(1, (game.state.upgradeRemaining || 0) + count);
+    game.state.upgradeMenu = true;
     game.state.upgradeChoices = generateUpgradeChoices(game);
     game.state.upgradeCursor = 0;
     // freeze gameplay but keep overlay interaction
     game.state.paused = true;
     game.overlayEl.style.opacity = "1";
     game.overlayEl.dataset.active = "true";
-
-    // Auto-pick in easy, or when enabled in settings
-    scheduleAutoUpgradePick();
   }
 
   function chooseUpgrade(index) {

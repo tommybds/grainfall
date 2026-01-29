@@ -252,6 +252,13 @@ body {
   font-weight: 700;
   margin-bottom: 10px;
 }
+.menuVersion {
+  margin-top: -6px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--muted2);
+}
 .rules { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 .k { color: var(--fg); }
 .hint { margin-top: 12px; color: var(--muted2); font-size: 12px; }

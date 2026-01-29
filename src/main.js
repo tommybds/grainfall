@@ -14,6 +14,8 @@ const APP_VERSION = (() => {
 
 const appVersionEl = document.getElementById("appVersion");
 if (appVersionEl) appVersionEl.textContent = `v${APP_VERSION}`;
+const menuVersionEl = document.getElementById("menuVersion");
+if (menuVersionEl) menuVersionEl.textContent = `v${APP_VERSION}`;
 
 /** @type {HTMLCanvasElement} */
 const canvas = document.getElementById("game");

@@ -217,6 +217,28 @@ body {
   border: 1px solid rgba(255,255,255,0.14);
   background: rgba(255,255,255,0.06);
 }
+/* Primary call-to-action */
+#btnStart.menuBtn {
+  border: 1px solid #000;
+  background: #ffd33d; /* arcade yellow */
+  color: #0b0b0b;
+  font-weight: 900;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  box-shadow:
+    /* pixel-ish double outline */
+    0 0 0 2px rgba(255, 211, 61, 0.95),
+    0 0 0 4px rgba(0, 0, 0, 0.75),
+    /* soft glow */
+    0 18px 60px rgba(255, 211, 61, 0.18);
+}
+#btnStart.menuBtn:hover {
+  background: #ffe58a;
+}
+#btnStart.menuBtn:focus-visible {
+  outline: 2px solid rgba(255, 211, 61, 0.95);
+  outline-offset: 2px;
+}
 
 .upgradeGrid {
   margin-top: 10px;

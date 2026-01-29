@@ -32,7 +32,11 @@ export function attachTouchJoystick({ canvas, viewport, input }) {
     // Use CSS size (not zoomed logical size) so the zone stays consistent.
     const w = viewport.cssW || viewport.w;
     const h = viewport.cssH || viewport.h;
-    return x < w * 0.55 && y > h * 0.45;
+    // Accept bottom-left OR bottom-right (leave a small center "safe" strip).
+    const inBottom = y > h * 0.45;
+    const inLeft = x < w * 0.45;
+    const inRight = x > w * 0.55;
+    return inBottom && (inLeft || inRight);
   }
 
   function applyVec(dx, dy) {

@@ -277,6 +277,21 @@ export function runGameLoop(game) {
     rafId = 0;
   }
 
+  function onBlur() {
+    // When the window loses focus (alt-tab / click another window),
+    // pause and stop rendering/updating to save CPU.
+    try {
+      game.setPaused?.(true);
+    } catch {
+      // ignore
+    }
+    stopLoop();
+  }
+
+  function onFocus() {
+    if (!document.hidden) startLoop();
+  }
+
   function tick() {
     if (suspended || document.hidden) {
       stopLoop();
@@ -312,6 +327,8 @@ export function runGameLoop(game) {
   // Also handle bfcache / tab restore.
   window.addEventListener("pagehide", stopLoop, { passive: true });
   window.addEventListener("pageshow", startLoop, { passive: true });
+  window.addEventListener("blur", onBlur, { passive: true });
+  window.addEventListener("focus", onFocus, { passive: true });
 
   if (document.hidden) stopLoop();
   else startLoop();

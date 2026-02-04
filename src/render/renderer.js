@@ -4,6 +4,7 @@ import { pickTerrainGlyph } from "./terrain.js";
 import { sampleTile } from "../game/world.js";
 import { ACHIEVEMENT_DEFS, formatTimeMMSS } from "../game/stats.js";
 import { weaponName, WEAPON_MAX_LEVEL } from "../game/weapons.js";
+import { xpToNext } from "../game/pickups.js";
 
 function readRgbVars(state) {
   const key = state.colorblind ? "cb1" : "cb0";
@@ -583,10 +584,10 @@ export function renderFrame(game) {
     const xpFill = document.getElementById("xpFill");
     const xpText = document.getElementById("xpText");
     const lvl = player.level || 1;
-    const xpToNext = Math.round(5 + lvl * 2.2 + lvl * lvl * 0.16);
-    const xpRatio = clamp((player.xp || 0) / (xpToNext || 1), 0, 1);
+    const need = xpToNext(lvl);
+    const xpRatio = clamp((player.xp || 0) / (need || 1), 0, 1);
     if (xpFill) xpFill.style.transform = `scaleX(${xpRatio})`;
-    if (xpText) xpText.textContent = `XP ${Math.floor(player.xp || 0)}/${xpToNext}`;
+    if (xpText) xpText.textContent = `XP ${Math.floor(player.xp || 0)}/${need}`;
     if (xpBar) xpBar.style.opacity = state.running ? "1" : "0.6";
   }
 
@@ -629,8 +630,15 @@ export function renderFrame(game) {
   const waveLeftStr = `${wmm}:${String(wss).padStart(2, "0")}`;
   const timeStr = formatTimeMMSS(state.t || 0);
   const extra = [];
-  if (state.nextBossIn !== undefined && state.nextBossIn <= 12 && !state.bossAlive) {
-    extra.push(`<span>BOSS <span class="v">${Math.ceil(state.nextBossIn)}s</span></span>`);
+  // Boss progression: kills + cooldown (see waves.js)
+  if (state.bossAlive) {
+    const bt = (state.bossType || "").toUpperCase();
+    const n = state.bossCount || 1;
+    extra.push(`<span>BOSS <span class="v">#${n}${bt ? ` ${bt}` : ""}</span></span>`);
+  } else if ((state.bossCooldownT || 0) > 0) {
+    extra.push(`<span>BOSS CD <span class="v">${Math.ceil(state.bossCooldownT || 0)}s</span></span>`);
+  } else if (state.nextBossKillsLeft !== undefined) {
+    extra.push(`<span>NEXT BOSS <span class="v">${Math.max(0, state.nextBossKillsLeft | 0)} kills</span></span>`);
   }
   if ((state.calmT || 0) > 0) {
     extra.push(`<span>CALME <span class="v">${Math.ceil(state.calmT || 0)}s</span></span>`);
@@ -812,7 +820,8 @@ export function renderFrame(game) {
       owned.innerHTML = `<span class="k">ARMES</span> <span class="v">${list || "-"}</span>`;
     }
     if (h) {
-      const base = `Choisis 1–3. (${Math.max(1, state.upgradeRemaining || 1)} restant)`;
+      const src = state.upgradeSource ? `SOURCE: ${state.upgradeSource} — ` : "";
+      const base = `${src}Choisis 1–3. (${Math.max(1, state.upgradeRemaining || 1)} restant)`;
       const toastActive = (state.upgradeToastUntilMs || 0) > performance.now() && state.upgradeToast;
       h.textContent = toastActive ? `${state.upgradeToast} — ${base}` : base;
     }
@@ -883,7 +892,7 @@ export function renderFrame(game) {
     } else {
       overlayEl.querySelector(".title").textContent = "GRAINFALL (ASCII)";
       overlayEl.querySelector(".hint").textContent =
-        "Bonus: ramasse *, +, ! (lvl up → armes). Boss toutes les 5 vagues.";
+        "Bonus: ramasse *, +, ! (lvl up → armes). Boss = quota de kills + cooldown.";
     }
   }
 }

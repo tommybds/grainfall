@@ -10,6 +10,16 @@ export function isBossWave(wave) {
   return wave > 0 && wave % CFG.bossEvery === 0;
 }
 
+function bossLabel(bt) {
+  const t = bt || "summoner";
+  if (t === "summoner") return "INVOCATEUR";
+  if (t === "rager") return "RAGEUR";
+  if (t === "artillery") return "ARTILLERIE";
+  if (t === "titan") return "TITAN";
+  if (t === "sack") return "SAC À PV";
+  return String(t).toUpperCase();
+}
+
 export function spawnEnemyAtEdge(game, kind, extra) {
   const { viewport, camera, enemies, state } = game;
   if (enemies.length >= CFG.maxEnemies) return;
@@ -57,8 +67,16 @@ export function spawnBoss(game) {
   const bossType = forced || pickWeighted(pool);
   spawnEnemyAtEdge(game, "boss", { bossType });
   game.state.bossType = bossType;
+  game.state.bossCount = (game.state.bossCount || 0) + 1;
   game.state.bossAlive = true;
   game.state.bossWave = game.state.wave;
+  // Announce clearly: number + name
+  game.floats.push({
+    x: game.player.x,
+    y: game.player.y - 34,
+    ttl: 1.8,
+    text: `BOSS #${game.state.bossCount} — ${bossLabel(bossType)}`,
+  });
 }
 
 export function updateWaves(dt, game) {
@@ -73,17 +91,17 @@ export function updateWaves(dt, game) {
     s.waveJustStarted = false;
   }
 
-  // Boss telegraph
-  const waveIn = s.t % CFG.waveSeconds;
-  const waveLeft = Math.max(0, CFG.waveSeconds - waveIn);
-  const nextBossWave = s.wave + (CFG.bossEvery - (s.wave % CFG.bossEvery || CFG.bossEvery));
-  s.nextBossWave = nextBossWave;
-  s.nextBossIn = (nextBossWave - s.wave) * CFG.waveSeconds + waveLeft;
-  // one-time warning when boss is close
-  if (s.nextBossIn <= 3.2 && !s.bossAlive) {
-    if (s._bossWarnWave !== s.wave) {
-      s._bossWarnWave = s.wave;
-      game.floats.push({ x: game.player.x, y: game.player.y - 30, ttl: 1.4, text: "BOSS INCOMING" });
+  // Boss pacing: based on enemies killed + cooldown.
+  s.bossCooldownT = Math.max(0, (s.bossCooldownT || 0) - dt);
+  const baseReq = 55 + (s.wave || 1) * 10;
+  const grow = (s.bossCount || 0) * 14;
+  s.bossKillsReq = Math.max(45, Math.round(baseReq + grow));
+  s.nextBossKillsLeft = Math.max(0, (s.bossKillsReq || 0) - (s.bossKillsSince || 0));
+  // One-time warning when close (kills-based)
+  if (!s.bossAlive && (s.bossCooldownT || 0) <= 0 && s.nextBossKillsLeft <= 12) {
+    if (s._bossWarnKills !== s.bossKillsSince) {
+      s._bossWarnKills = s.bossKillsSince;
+      game.floats.push({ x: game.player.x, y: game.player.y - 30, ttl: 1.4, text: "BOSS BIENTÔT" });
     }
   }
 
@@ -123,11 +141,10 @@ export function updateWaves(dt, game) {
     }
   }
 
-  // boss trigger (once per boss wave)
-  if (isBossWave(s.wave) && !s.bossAlive && s.bossWave !== s.wave) {
+  // boss trigger (kills + cooldown)
+  if (!s.bossAlive && (s.bossCooldownT || 0) <= 0 && (s.bossKillsSince || 0) >= (s.bossKillsReq || 0)) {
+    s.bossKillsSince = 0;
     spawnBoss(game);
-    const bt = (game.state.bossType || "").toUpperCase();
-    game.floats.push({ x: game.player.x, y: game.player.y - 34, ttl: 1.6, text: bt ? `BOSS: ${bt}` : "BOSS" });
   }
 
   // spawn pacing: slightly calmer during boss
@@ -169,11 +186,17 @@ export function updateWaves(dt, game) {
   // boss check
   if (s.bossAlive) {
     const bossStill = game.enemies.some((e) => e.isBoss);
-    if (!bossStill) s.bossAlive = false;
+    if (!bossStill) {
+      s.bossAlive = false;
+      // Cooldown window after boss death (breathing room).
+      s.bossCooldownT = 10.0;
+      s.calmT = Math.max(s.calmT || 0, 3.2);
+      game.floats.push({ x: game.player.x, y: game.player.y - 28, ttl: 1.3, text: "BOSS DOWN" });
+    }
   }
 
   // optional: small reward at wave start
-  if (s.waveJustStarted && !isBossWave(s.wave)) {
+  if (s.waveJustStarted && !s.bossAlive) {
     if (Math.random() < 0.25) {
       game.floats.push({ x: game.player.x, y: game.player.y - 24, ttl: 1.2, text: `WAVE ${s.wave}` });
     }

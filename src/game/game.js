@@ -46,6 +46,12 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       spawnAcc: 0,
       bossAlive: false,
       bossWave: 0,
+      bossType: "",
+      bossCount: 0,
+      bossKillsSince: 0,
+      bossKillsReq: 0,
+      bossCooldownT: 0,
+      nextBossKillsLeft: 0,
       hitFlash: 0,
       wallBumpT: 0,
       wallBumpX: 0,
@@ -56,6 +62,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       upgradeRemaining: 0,
       upgradeChoices: [],
       upgradeCursor: 0,
+      upgradeSource: "",
       // settings (from UI)
       autoUpgrade: false,
       // small notification shown in upgrade hint (renderer)
@@ -146,6 +153,12 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.difficulty = 1;
     game.state.bossAlive = false;
     game.state.bossWave = 0;
+    game.state.bossType = "";
+    game.state.bossCount = 0;
+    game.state.bossKillsSince = 0;
+    game.state.bossKillsReq = 0;
+    game.state.bossCooldownT = 0;
+    game.state.nextBossKillsLeft = 0;
     game.state.hitFlash = 0;
     game.state.wallBumpT = 0;
     game.state.wallBumpX = 0;
@@ -155,6 +168,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.upgradeRemaining = 0;
     game.state.upgradeChoices = [];
     game.state.upgradeCursor = 0;
+    game.state.upgradeSource = "";
     game.state.statsMenu = false;
     game.state.tutorialMenu = false;
 
@@ -242,7 +256,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.dashReq = true;
   }
 
-  function openUpgradeMenu(count = 1) {
+  function openUpgradeMenu(count = 1, source = "") {
     if (!count || count <= 0) return;
     // If auto-upgrade is enabled (or forced by difficulty), don't show the upgrade menu at all.
     // Apply upgrades immediately so gameplay stays fluid.
@@ -258,6 +272,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     }
 
     game.state.upgradeRemaining = Math.max(1, (game.state.upgradeRemaining || 0) + count);
+    if (source) game.state.upgradeSource = source;
     game.state.upgradeMenu = true;
     game.state.upgradeChoices = generateUpgradeChoices(game);
     game.state.upgradeCursor = 0;
@@ -287,6 +302,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.upgradeMenu = false;
     game.state.upgradeChoices = [];
     game.state.upgradeCursor = 0;
+    game.state.upgradeSource = "";
     game.state.paused = false;
     game.overlayEl.style.opacity = "0";
     game.overlayEl.dataset.active = "false";

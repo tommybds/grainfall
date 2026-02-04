@@ -2,6 +2,15 @@
 
 Ce projet suit le format de [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) et applique (au mieux) la sémantique de versionnage.
 
+## [0.4.1] - 2026-02-04
+
+### Added
+- **Boss pacing**: boss déclenchés par **quota de kills** + **cooldown** (avec annonces claires `BOSS #N — NOM`).
+- **Upgrade menu**: affiche la **source** (`LEVEL UP` / `BUFF` / `CHEST`).
+- **XP late-game**: courbe plus raide après ~lvl 15 pour éviter le spam d’upgrades.
+- **Nouveau boss**: `sack` (“sac à PV”).
+- **Succès**: ajout d’une grosse série (armes, boss types, économie/pickups, survie, etc.).
+
 ## [0.3.3] - 2026-01-29
 
 ### Added
@@ -54,3 +63,4 @@ Ce projet suit le format de [Keep a Changelog](https://keepachangelog.com/en/1.1
 [0.3.0]: https://github.com/tommybds/grainfall
 [0.2.0]: https://github.com/tommybds/grainfall
 [0.3.3]: https://github.com/tommybds/grainfall
+[0.4.1]: https://github.com/tommybds/grainfall

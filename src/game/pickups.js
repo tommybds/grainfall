@@ -217,7 +217,7 @@ export function applyPickup(game, p) {
       game.audio?.levelUp?.();
     }
     if (gained > 0) {
-      game.openUpgradeMenu?.(gained);
+      game.openUpgradeMenu?.(gained, "LEVEL UP");
     }
     return;
   }
@@ -231,19 +231,22 @@ export function applyPickup(game, p) {
   if (p.kind === "buff") {
     game.audio?.pickup?.("buff");
     // buff becomes an upgrade-choice trigger (more strategic).
-    game.openUpgradeMenu?.(1);
+    game.openUpgradeMenu?.(1, "BUFF");
     return;
   }
   if (p.kind === "chest") {
     game.audio?.pickup?.("chest");
     // guaranteed upgrades
-    game.openUpgradeMenu?.(1);
+    game.openUpgradeMenu?.(1, "CHEST");
   }
 }
 
-function xpToNext(level) {
-  // fast early game, slower later
-  return Math.round(5 + level * 2.2 + level * level * 0.16);
+export function xpToNext(level) {
+  // fast early game, slower later; ramps harder after ~lvl 15 to avoid upgrade spam.
+  const l = Math.max(1, level | 0);
+  const base = 6 + l * 2.6 + l * l * 0.22;
+  const late = l > 15 ? (l - 15) * (l - 15) * 1.6 : 0;
+  return Math.round(base + late);
 }
 
 // legacy random upgrades removed (we now use upgrade menu choices)

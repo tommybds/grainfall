@@ -26,6 +26,8 @@ function killEnemy(game, idx, sourceKind) {
   game.enemies.splice(idx, 1);
   game.state.kills += 1;
   game.floats.push({ x: e.x, y: e.y - 18, ttl: 0.9, text: "+1" });
+  // Boss progression is based on enemies killed (non-boss).
+  if (!e.isBoss) game.state.bossKillsSince = (game.state.bossKillsSince || 0) + 1;
 
   // XP coins: small pieces that must be picked up.
   // Keep it cheap: cap coin count and avoid exceeding pickup limit.

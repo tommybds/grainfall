@@ -1,11 +1,13 @@
 import { clamp } from "./math.js";
 
 export function createViewport() {
-  return { w: 0, h: 0, dpr: 1, zoom: 1, cssW: 0, cssH: 0 };
+  return { w: 0, h: 0, dpr: 1, zoom: 1, cssW: 0, cssH: 0, cssX: 0, cssY: 0 };
 }
 
 export function resizeCanvasToViewport(canvas, ctx, viewport) {
   const rect = canvas.getBoundingClientRect();
+  viewport.cssX = rect.left || 0;
+  viewport.cssY = rect.top || 0;
   viewport.cssW = Math.max(0, rect.width);
   viewport.cssH = Math.max(0, rect.height);
   viewport.dpr = Math.max(1, window.devicePixelRatio || 1);

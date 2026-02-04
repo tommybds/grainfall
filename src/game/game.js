@@ -568,8 +568,26 @@ function update(dt, game) {
   }
 
   // camera follows player
-  const targetCamX = game.player.x - game.viewport.w * 0.5;
-  const targetCamY = game.player.y - game.viewport.h * 0.5;
+  let targetCamX = game.player.x - game.viewport.w * 0.5;
+  let targetCamY = game.player.y - game.viewport.h * 0.5;
+
+  // On very wide layouts the canvas may not start at (0,0) in the page (topbar, etc).
+  // Center the player relative to the browser viewport (not only inside the canvas).
+  try {
+    const v = game.viewport;
+    const zoom = Math.max(0.5, Math.min(1.25, v.zoom || 1));
+    const desiredXCss = (window.innerWidth * 0.5) - (v.cssX || 0);
+    const desiredYCss = (window.innerHeight * 0.5) - (v.cssY || 0);
+    const desiredX = desiredXCss / zoom;
+    const desiredY = desiredYCss / zoom;
+    // Clamp desired point within the canvas to avoid weirdness if layout changes.
+    const dx = clamp(desiredX, 0, v.w || 0);
+    const dy = clamp(desiredY, 0, v.h || 0);
+    targetCamX = game.player.x - dx;
+    targetCamY = game.player.y - dy;
+  } catch {
+    // ignore
+  }
   // On wide screens, camera smoothing becomes noticeable (player not perfectly centered).
   // Snap to center for big viewports; keep smoothing on smaller screens.
   const isWide = (game.viewport.w || 0) >= 900 || (game.viewport.h || 0) >= 600;
@@ -671,6 +689,9 @@ function update(dt, game) {
     if (len2(p.x - game.player.x, p.y - game.player.y) <= rr * rr) {
       applyPickup(game, p);
       game.pickups.splice(i, 1);
+      // If picking up XP caused a level-up, the upgrade menu may open and pause the run.
+      // Stop processing more pickups this frame to avoid weird "stacking" / reshuffling.
+      if (s.upgradeMenu) break;
       // objective tracking
       if (s.objective && !s.objective.done && s.objective.type === "pickups") {
         s.objective.progress += 1;

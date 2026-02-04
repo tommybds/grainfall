@@ -212,6 +212,48 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       summonCd: randRange(1.2, 2.6),
     };
   }
+  if (kind === "grenadier") {
+    const hpMax = (34 + wave * 7 + randRange(0, 14)) * mHp;
+    return {
+      kind,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: 10,
+      hp: hpMax,
+      hpMax,
+      speed: (28 + wave * 1.1 + randRange(0, 6)) * mSp,
+      dmgMul: 1.0,
+      xp: 3,
+      isBoss: false,
+      throwCd: randRange(0.8, 2.0),
+      throwWindT: 0,
+      throwTx: 0,
+      throwTy: 0,
+    };
+  }
+  if (kind === "pyro") {
+    const hpMax = (38 + wave * 7 + randRange(0, 14)) * mHp;
+    return {
+      kind,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: 10,
+      hp: hpMax,
+      hpMax,
+      speed: (34 + wave * 1.4 + randRange(0, 6)) * mSp,
+      dmgMul: 1.0,
+      xp: 3,
+      isBoss: false,
+      fireCd: randRange(1.0, 2.4),
+      fireWindT: 0,
+      fireTx: 0,
+      fireTy: 0,
+    };
+  }
   if (kind === "boss") {
     const bt = bossType || "summoner";
     // Boss scaling: stronger later (linear + quadratic), still affected by difficulty multipliers.

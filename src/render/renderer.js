@@ -258,12 +258,12 @@ export function renderFrame(game) {
       continue;
     }
 
-    if (kind === "explosionFx") {
+    if (kind === "explosionFx" || kind === "enemyExplosionFx") {
       const r = b.radius || 60;
       const t = clamp((b.ttl || 0) / 0.22, 0, 1);
       ctx.save();
       ctx.globalAlpha = 0.45 * (1 - t);
-      ctx.strokeStyle = "rgba(255, 210, 90, 0.85)";
+      ctx.strokeStyle = kind === "enemyExplosionFx" ? "rgba(255, 120, 90, 0.90)" : "rgba(255, 210, 90, 0.85)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(sx, sy, r * (1 - t), 0, Math.PI * 2);
@@ -343,12 +343,57 @@ export function renderFrame(game) {
     ctx.restore();
   }
 
-  // enemy bullets (dots)
+  // enemy bullets (dots + zones)
   for (let i = 0; i < enemyBullets.length; i++) {
     const b = enemyBullets[i];
     const sx = b.x - camera.x;
     const sy = b.y - camera.y;
-    ctx.fillStyle = b.kind === "spit" ? "rgba(255, 120, 90, 0.85)" : fgDim;
+    const kind = b.kind || "enemy";
+
+    if (kind === "grenade") {
+      const r = b.radius || 60;
+      const t = clamp((b.armT || 0) / 0.75, 0, 1);
+      const pulse = 0.75 + 0.25 * Math.sin((state.t || 0) * 10 + i);
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.28 + 0.35 * (1 - t);
+      ctx.strokeStyle = `rgba(255, 160, 90, ${0.55 + 0.35 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.22 + 0.30 * (1 - t);
+      ctx.fillStyle = `rgba(255, 120, 90, ${0.20 + 0.25 * pulse})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.max(6, r * 0.18), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+
+    if (kind === "fireZone") {
+      const r = b.radius || 56;
+      const warm = b.warmT || 0;
+      const pulse = 0.75 + 0.25 * Math.sin((state.t || 0) * 9 + i * 0.8);
+      ctx.save();
+      ctx.shadowBlur = 0;
+      const a = warm > 0 ? 0.18 : 0.30;
+      ctx.globalAlpha = a + 0.12 * pulse;
+      ctx.fillStyle = `rgba(255, 120, 90, ${0.20 + 0.25 * pulse})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.42 + 0.20 * pulse;
+      ctx.strokeStyle = `rgba(255, 160, 90, ${0.55 + 0.35 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
+    ctx.fillStyle = kind === "spit" ? "rgba(255, 120, 90, 0.85)" : fgDim;
     ctx.beginPath();
     ctx.arc(sx, sy, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -363,7 +408,14 @@ export function renderFrame(game) {
     const sy = e.y - camera.y;
     if (sx < -80 || sy < -80 || sx > viewport.w + 80 || sy > viewport.h + 80) continue;
 
-    const elite = e.isBoss || e.kind === "tank" || e.kind === "spitter" || e.kind === "shield" || e.kind === "summoner";
+    const elite =
+      e.isBoss ||
+      e.kind === "tank" ||
+      e.kind === "spitter" ||
+      e.kind === "shield" ||
+      e.kind === "summoner" ||
+      e.kind === "grenadier" ||
+      e.kind === "pyro";
     const discR = e.isBoss ? 56 : elite ? 30 : 22;
     const discA = e.isBoss ? 0.14 : elite ? 0.11 : 0.09;
     drawSoftDisc(ctx, sx, sy, discR, discA);
@@ -376,6 +428,8 @@ export function renderFrame(game) {
     else if (e.kind === "charger") ch = "}";
     else if (e.kind === "exploder") ch = "*";
     else if (e.kind === "summoner") ch = "M";
+    else if (e.kind === "grenadier") ch = "g";
+    else if (e.kind === "pyro") ch = "~";
     else if (e.isBoss) {
       const bt = e.bossType || "summoner";
       ch = bt === "sack" ? "O" : bt === "titan" ? "T" : bt === "rager" ? "R" : bt === "artillery" ? "A" : "@";
@@ -388,6 +442,18 @@ export function renderFrame(game) {
       ctx.save();
       ctx.shadowBlur = 0;
       const t = clamp((e.windT || 0) / 0.28, 0, 1);
+      ctx.globalAlpha = 0.35 + 0.55 * (1 - t);
+      ctx.fillStyle = "rgba(255,160,90,0.95)";
+      ctx.font = `18px ${CFG.fontFamily}`;
+      drawEntityChar(ctx, sx, sy - 18, "!", 1);
+      ctx.restore();
+    }
+
+    // Telegraphed grenadier throw / pyro cast
+    if ((e.kind === "grenadier" && (e.throwWindT || 0) > 0) || (e.kind === "pyro" && (e.fireWindT || 0) > 0)) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      const t = e.kind === "grenadier" ? clamp((e.throwWindT || 0) / 0.45, 0, 1) : clamp((e.fireWindT || 0) / 0.38, 0, 1);
       ctx.globalAlpha = 0.35 + 0.55 * (1 - t);
       ctx.fillStyle = "rgba(255,160,90,0.95)";
       ctx.font = `18px ${CFG.fontFamily}`;

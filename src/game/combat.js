@@ -284,6 +284,91 @@ export function updateEnemies(dt, game) {
       }
     }
 
+    // special: grenadier lobs grenades (telegraphed AoE) to force movement
+    if (e.kind === "grenadier") {
+      // keep distance
+      const dx = player.x - e.x;
+      const dy = player.y - e.y;
+      const d2 = dx * dx + dy * dy;
+      const keepAway = 190;
+      const dir = d2 < keepAway * keepAway ? norm(-dx, -dy) : toP;
+      e.vx = dir.x * spd;
+      e.vy = dir.y * spd;
+
+      if ((e.throwWindT || 0) > 0) {
+        e.throwWindT = Math.max(0, (e.throwWindT || 0) - dt);
+        // stop while aiming
+        e.vx = 0;
+        e.vy = 0;
+        if ((e.throwWindT || 0) <= 0) {
+          const r = 54 + state.wave * 0.3;
+          game.enemyBullets.push({
+            x: e.throwTx || player.x,
+            y: e.throwTy || player.y,
+            vx: 0,
+            vy: 0,
+            dmg: 22 + state.wave * 1.2,
+            ttl: 0.75,
+            r: 0,
+            kind: "grenade",
+            radius: r,
+            armT: 0.75,
+          });
+        }
+      } else {
+        e.throwCd = (e.throwCd || 0) - dt;
+        if ((e.throwCd || 0) <= 0) {
+          e.throwCd = clamp(3.2 - state.wave * 0.03, 1.6, 3.2);
+          e.throwWindT = 0.45;
+          // predict slightly ahead of player movement
+          const lead = 0.25;
+          e.throwTx = player.x + (player.vx || 0) * lead;
+          e.throwTy = player.y + (player.vy || 0) * lead;
+        }
+      }
+    }
+
+    // special: pyro places a flame zone (DoT area)
+    if (e.kind === "pyro") {
+      const dx = player.x - e.x;
+      const dy = player.y - e.y;
+      const d2 = dx * dx + dy * dy;
+      const keepAway = 160;
+      const dir = d2 < keepAway * keepAway ? norm(-dx, -dy) : toP;
+      e.vx = dir.x * spd;
+      e.vy = dir.y * spd;
+
+      if ((e.fireWindT || 0) > 0) {
+        e.fireWindT = Math.max(0, (e.fireWindT || 0) - dt);
+        e.vx = 0;
+        e.vy = 0;
+        if ((e.fireWindT || 0) <= 0) {
+          game.enemyBullets.push({
+            x: e.fireTx || player.x,
+            y: e.fireTy || player.y,
+            vx: 0,
+            vy: 0,
+            dmg: 0,
+            ttl: 3.0,
+            r: 0,
+            kind: "fireZone",
+            radius: 58,
+            warmT: 0.35,
+            dps: 12 + state.wave * 0.55,
+          });
+        }
+      } else {
+        e.fireCd = (e.fireCd || 0) - dt;
+        if ((e.fireCd || 0) <= 0) {
+          e.fireCd = clamp(3.0 - state.wave * 0.03, 1.5, 3.0);
+          e.fireWindT = 0.38;
+          const lead = 0.18;
+          e.fireTx = player.x + (player.vx || 0) * lead;
+          e.fireTy = player.y + (player.vy || 0) * lead;
+        }
+      }
+    }
+
     // --- Boss patterns (variety via e.bossType) ---
     if (e.isBoss) {
       const bt = e.bossType || "summoner";
@@ -643,12 +728,65 @@ export function updateEnemyBullets(dt, game) {
     b.ttl -= dt;
     const prevX = b.x;
     const prevY = b.y;
-    b.x += b.vx * dt;
-    b.y += b.vy * dt;
     if (b.ttl <= 0) {
       enemyBullets.splice(i, 1);
       continue;
     }
+
+    // Special: telegraphed grenade marker -> explode
+    if (b.kind === "grenade") {
+      b.armT = Math.max(0, (b.armT || 0) - dt);
+      if ((b.armT || 0) > 0) continue;
+      const r = b.radius || 60;
+      // FX ring (reuse bullets layer)
+      if (game.bullets.length < CFG.maxBullets) {
+        game.bullets.push({ x: b.x, y: b.y, vx: 0, vy: 0, dmg: 0, ttl: 0.26, r: 0, kind: "enemyExplosionFx", radius: r });
+      }
+      // Damage if player inside
+      const rr = r + player.r;
+      if (len2(b.x - player.x, b.y - player.y) <= rr * rr) {
+        const boom = (b.dmg || 24) * dmgMul;
+        player.hp -= boom;
+        game.state.hitFlash = 0.22;
+        game.state.damageAngle = Math.atan2(b.y - player.y, b.x - player.x);
+        game.state.damageT = 0.95;
+        game.audio?.hit?.(true);
+        game.floats.push({ x: player.x, y: player.y - 18, ttl: 0.8, text: `-${Math.round(boom)}` });
+        if (player.hp <= 0) {
+          player.hp = 0;
+          game.endGame();
+          return;
+        }
+      }
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    // Special: stationary fire zone (DoT area)
+    if (b.kind === "fireZone") {
+      b.warmT = Math.max(0, (b.warmT || 0) - dt);
+      const r = b.radius || 56;
+      if ((b.warmT || 0) <= 0) {
+        const rr = r + player.r;
+        if (len2(b.x - player.x, b.y - player.y) <= rr * rr) {
+          const dps = (b.dps || 10) * dmgMul;
+          player.hp -= dps * dt;
+          game.state.hitFlash = Math.max(game.state.hitFlash || 0, 0.06);
+          game.state.damageAngle = Math.atan2(b.y - player.y, b.x - player.x);
+          game.state.damageT = Math.max(game.state.damageT || 0, 0.25);
+          if (player.hp <= 0) {
+            player.hp = 0;
+            game.endGame();
+            return;
+          }
+        }
+      }
+      continue;
+    }
+
+    // classic movement
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
 
     // Enemy bullets are destroyed on walls (fairness/readability).
     if (bulletHitWall(game.selectedMapId, b.x, b.y) && !bulletHitWall(game.selectedMapId, prevX, prevY)) {

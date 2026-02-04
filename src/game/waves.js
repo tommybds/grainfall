@@ -171,6 +171,9 @@ export function updateWaves(dt, game) {
     { item: "charger", w: Math.max(0, w - 4) * 0.9 },
     { item: "exploder", w: Math.max(0, w - 5) * 1.0 },
     { item: "summoner", w: Math.max(0, w - 6) * 0.8 },
+    // zone denial (arrive gradually)
+    { item: "grenadier", w: Math.max(0, w - 7) * 0.9 },
+    { item: "pyro", w: Math.max(0, w - 9) * 0.85 },
   ];
 
   while (s.spawnAcc >= 1) {

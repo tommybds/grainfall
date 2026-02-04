@@ -2,7 +2,7 @@
 
 Ce projet suit le format de [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) et applique (au mieux) la sémantique de versionnage.
 
-## [0.4.1] - 2026-02-04
+## [4.0.2] - 2026-02-04
 
 ### Added
 - **Boss pacing**: boss déclenchés par **quota de kills** + **cooldown** (avec annonces claires `BOSS #N — NOM`).
@@ -63,4 +63,4 @@ Ce projet suit le format de [Keep a Changelog](https://keepachangelog.com/en/1.1
 [0.3.0]: https://github.com/tommybds/grainfall
 [0.2.0]: https://github.com/tommybds/grainfall
 [0.3.3]: https://github.com/tommybds/grainfall
-[0.4.1]: https://github.com/tommybds/grainfall
+[4.0.2]: https://github.com/tommybds/grainfall

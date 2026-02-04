@@ -48,9 +48,12 @@ export function spawnBoss(game) {
     { item: "rager", w: Math.max(0, w - 8) * 1.2 },
     { item: "artillery", w: Math.max(0, w - 12) * 1.1 },
     { item: "titan", w: Math.max(0, w - 18) * 0.9 },
+    // Pure HP sponge (very tanky, simpler pattern)
+    { item: "sack", w: Math.max(0, w - 14) * 1.1 },
   ].filter((x) => x.w > 0);
   // Guarantee early variety.
-  const forced = w === 5 ? "summoner" : w === 10 ? "rager" : w === 15 ? "artillery" : w === 20 ? "titan" : null;
+  const forced =
+    w === 5 ? "summoner" : w === 10 ? "rager" : w === 15 ? "artillery" : w === 20 ? "titan" : w === 25 ? "sack" : null;
   const bossType = forced || pickWeighted(pool);
   spawnEnemyAtEdge(game, "boss", { bossType });
   game.state.bossType = bossType;

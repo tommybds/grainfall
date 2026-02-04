@@ -216,10 +216,10 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
     const bt = bossType || "summoner";
     // Boss scaling: stronger later (linear + quadratic), still affected by difficulty multipliers.
     const hpBase = 520 + wave * 200 + wave * wave * 4.2;
-    const hpMax = hpBase * mHp * (bt === "titan" ? 1.35 : bt === "rager" ? 1.05 : 1);
+    const hpMax = hpBase * mHp * (bt === "sack" ? 2.35 : bt === "titan" ? 1.35 : bt === "rager" ? 1.05 : 1);
     const spBase = 26 + wave * 1.0;
-    const speed = spBase * mSp * (bt === "rager" ? 1.25 : bt === "artillery" ? 0.95 : 1);
-    const dmgMul = (2.1 + wave * 0.03) * (bt === "titan" ? 1.25 : 1);
+    const speed = spBase * mSp * (bt === "sack" ? 0.85 : bt === "rager" ? 1.25 : bt === "artillery" ? 0.95 : 1);
+    const dmgMul = (2.1 + wave * 0.03) * (bt === "sack" ? 1.15 : bt === "titan" ? 1.25 : 1);
     return {
       kind,
       bossType: bt,
@@ -227,12 +227,12 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       y,
       vx: 0,
       vy: 0,
-      r: bt === "titan" ? 22 : 18,
+      r: bt === "sack" ? 26 : bt === "titan" ? 22 : 18,
       hp: hpMax,
       hpMax,
       speed,
       dmgMul,
-      xp: 24,
+      xp: bt === "sack" ? 40 : 24,
       isBoss: true,
       // shared boss cooldowns (used by patterns in combat.js)
       bossCd: randRange(0.8, 1.6),

@@ -154,11 +154,8 @@ export function maybeDropPickup(game, x, y, enemy) {
     game.pickups.push(createPickup({ x, y, kind: "chest", value: 1 }));
     return;
   }
-  if (roll < 0.45) {
-    game.pickups.push(createPickup({ x, y, kind: "xp", value: enemy.isBoss ? 8 : enemy.xp }));
-    return;
-  }
-  if (roll < 0.7) {
+  // XP is now primarily earned via coins on kills (see combat.js), so we avoid dropping extra XP pickups.
+  if (roll < 0.6) {
     game.pickups.push(createPickup({ x, y, kind: "heal", value: enemy.isBoss ? 35 : 18 }));
     return;
   }
@@ -211,7 +208,8 @@ export function applyPickup(game, p) {
     player.xp += p.value;
     // simple leveling curve
     let gained = 0;
-    while (player.xp >= xpToNext(player.level)) {
+    // Prevent multi-level spikes from a single pickup (keeps upgrades paced).
+    while (player.xp >= xpToNext(player.level) && gained < 1) {
       player.xp -= xpToNext(player.level);
       player.level += 1;
       gained += 1;
@@ -239,7 +237,7 @@ export function applyPickup(game, p) {
   if (p.kind === "chest") {
     game.audio?.pickup?.("chest");
     // guaranteed upgrades
-    game.openUpgradeMenu?.(2);
+    game.openUpgradeMenu?.(1);
   }
 }
 

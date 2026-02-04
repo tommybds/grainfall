@@ -377,7 +377,7 @@ export function renderFrame(game) {
     else if (e.kind === "summoner") ch = "M";
     else if (e.isBoss) {
       const bt = e.bossType || "summoner";
-      ch = bt === "titan" ? "T" : bt === "rager" ? "R" : bt === "artillery" ? "A" : "@";
+      ch = bt === "sack" ? "O" : bt === "titan" ? "T" : bt === "rager" ? "R" : bt === "artillery" ? "A" : "@";
     }
     const glyphScale = e.isBoss ? 1.55 : elite ? 1.22 : 1;
     drawEntityCharScaled(ctx, sx, sy, ch, glyphScale, e.isBoss ? 1 : 0.95);

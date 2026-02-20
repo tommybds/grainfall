@@ -37,10 +37,21 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       paused: false,
       gameOver: false,
       t: 0,
+      waveClock: 0,
       lastMs: performance.now(),
       kills: 0,
       wave: 1,
       waveJustStarted: false,
+      phase: "combat", // "combat" | "exploration"
+      lastExploreWave: 0,
+      exploreT: 0,
+      exploreDuration: 0,
+      exploreThreat: 0,
+      explorePicked: false,
+      exploreCenterX: 0,
+      exploreCenterY: 0,
+      exploreSites: [],
+      exploreAmbushCd: 0,
       difficulty: 1,
       diff: difficultyById("normal"),
       spawnAcc: 0,
@@ -146,9 +157,20 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.paused = false;
     game.state.gameOver = false;
     game.state.t = 0;
+    game.state.waveClock = 0;
     game.state.lastMs = performance.now();
     game.state.kills = 0;
     game.state.wave = 1;
+    game.state.phase = "combat";
+    game.state.lastExploreWave = 0;
+    game.state.exploreT = 0;
+    game.state.exploreDuration = 0;
+    game.state.exploreThreat = 0;
+    game.state.explorePicked = false;
+    game.state.exploreCenterX = 0;
+    game.state.exploreCenterY = 0;
+    game.state.exploreSites = [];
+    game.state.exploreAmbushCd = 0;
     game.state.spawnAcc = 0;
     game.state.difficulty = 1;
     game.state.bossAlive = false;
@@ -441,8 +463,13 @@ export function runGameLoop(game) {
     if (game.state.damageT > 0) game.state.damageT = Math.max(0, game.state.damageT - dt);
     if (game.state.wallBumpT > 0) game.state.wallBumpT = Math.max(0, game.state.wallBumpT - dt);
 
-    if (game.state.running && !game.state.paused && !game.state.gameOver) {
-      update(dt, game);
+    if (game.state.running && !game.state.gameOver) {
+      if (!game.state.paused) {
+        update(dt, game);
+      } else if (game.state.phase === "exploration") {
+        // Keep exploration timer honest even while paused in upgrade/menu overlays.
+        updateWaves(dt, game);
+      }
     }
 
     renderFrame(game);
@@ -471,6 +498,7 @@ export function runGameLoop(game) {
 function update(dt, game) {
   const s = game.state;
   s.t += dt;
+  if (s.phase !== "exploration") s.waveClock = (s.waveClock || 0) + dt;
 
   // wave system (spawns + boss)
   updateWaves(dt, game);
@@ -481,7 +509,8 @@ function update(dt, game) {
     const wave = Number(s.wave) || 1;
     const base = Math.max(0, wave - 1) / 14; // ~full intensity around wave 15
     const tBoost = (Number(s.t) || 0) / 240; // gentle ramp if player stalls
-    const x = Math.max(0, Math.min(1, Math.max(base, tBoost)));
+    let x = Math.max(0, Math.min(1, Math.max(base, tBoost)));
+    if (s.phase === "exploration") x *= 0.55;
     game.audio.setIntensity(x);
   }
 
@@ -718,7 +747,7 @@ function update(dt, game) {
   // objective tracking (kills/time) + reward
   if (s.objective && !s.objective.done) {
     if (s.objective.type === "kills") s.objective.progress = s.kills || 0;
-    if (s.objective.type === "time") s.objective.progress = Math.floor(s.t || 0);
+    if (s.objective.type === "time") s.objective.progress = Math.floor(s.waveClock || 0);
     if (s.objective.progress >= s.objective.target) {
       s.objective.done = true;
       // Reward: drop a chest near the player
@@ -736,8 +765,7 @@ function update(dt, game) {
   }
 
   // keep pressure even if player is too safe early: ensure at least a few enemies
-  if (game.enemies.length < 3 && !s.bossAlive) {
+  if (s.phase !== "exploration" && game.enemies.length < 3 && !s.bossAlive) {
     if (Math.random() < 0.05) spawnEnemyAtEdge(game, "walker");
   }
 }
-

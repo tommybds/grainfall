@@ -235,6 +235,29 @@ export function renderFrame(game) {
     }
   }
 
+  // Exploration points of interest (one must be chosen before timer ends).
+  if (state.phase === "exploration" && Array.isArray(state.exploreSites) && state.exploreSites.length) {
+    ctx.save();
+    for (let i = 0; i < state.exploreSites.length; i++) {
+      const site = state.exploreSites[i];
+      if (!site || site.taken) continue;
+      const sx = site.x - camera.x;
+      const sy = site.y - camera.y;
+      if (sx < -48 || sy < -48 || sx > viewport.w + 48 || sy > viewport.h + 48) continue;
+      const pulse = 0.8 + 0.2 * Math.sin((state.t || 0) * 6 + i * 0.8);
+      drawSoftDisc(ctx, sx, sy, 16 + pulse * 8, 0.15 + pulse * 0.05);
+      ctx.strokeStyle = "rgba(242,242,242,0.55)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 13 + pulse * 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(242,242,242,0.9)";
+      ctx.font = `${CFG.fontSize + 5}px ${CFG.fontFamily}`;
+      drawEntityChar(ctx, sx, sy, String(site.id || "!"), 1);
+    }
+    ctx.restore();
+  }
+
   // bullets
   ctx.shadowBlur = 0;
   for (let i = 0; i < bullets.length; i++) {
@@ -690,12 +713,22 @@ export function renderFrame(game) {
       }
     }
   }
-  const waveLeft = Math.max(0, CFG.waveSeconds - (state.t % CFG.waveSeconds));
+  const waveClock = Number(state.waveClock ?? state.t) || 0;
+  const waveLeft = Math.max(0, CFG.waveSeconds - (waveClock % CFG.waveSeconds));
   const wmm = Math.floor(waveLeft / 60);
   const wss = Math.floor(waveLeft % 60);
   const waveLeftStr = `${wmm}:${String(wss).padStart(2, "0")}`;
   const timeStr = formatTimeMMSS(state.t || 0);
   const extra = [];
+  if (state.phase === "exploration") {
+    extra.push(`<span>PHASE <span class="v">EXPLORATION</span></span>`);
+    extra.push(`<span>EXPLORE <span class="v">${Math.ceil(state.exploreT || 0)}s</span></span>`);
+    extra.push(`<span>MENACE <span class="v">${Math.round(clamp(state.exploreThreat || 0, 0, 1) * 100)}%</span></span>`);
+    const left = Array.isArray(state.exploreSites) ? state.exploreSites.filter((x) => x && !x.taken).length : 0;
+    if (!state.explorePicked) extra.push(`<span>POI <span class="v">${left}</span></span>`);
+  } else {
+    extra.push(`<span>PHASE <span class="v">COMBAT</span></span>`);
+  }
   // Boss progression: kills + cooldown (see waves.js)
   if (state.bossAlive) {
     const bt = (state.bossType || "").toUpperCase();
@@ -962,4 +995,3 @@ export function renderFrame(game) {
     }
   }
 }
-

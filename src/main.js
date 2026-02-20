@@ -30,6 +30,45 @@ const game = createGame({ canvas, ctx, hudEl, overlayEl });
 game.goToMenu();
 runGameLoop(game);
 
+// --- Desktop controls onboarding ---
+const DESKTOP_ONBOARDING_KEY = "gf_desktop_onboarding_v1";
+const desktopOnboardingEl = document.getElementById("desktopOnboarding");
+const btnDismissDesktopOnboarding = document.getElementById("btnDismissDesktopOnboarding");
+
+function isDesktopProfile() {
+  try {
+    return window.matchMedia("(min-width: 720px) and (hover: hover) and (pointer: fine)").matches;
+  } catch {
+    return window.innerWidth >= 720;
+  }
+}
+
+function isDesktopOnboardingDismissed() {
+  try {
+    return localStorage.getItem(DESKTOP_ONBOARDING_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function dismissDesktopOnboarding() {
+  try {
+    localStorage.setItem(DESKTOP_ONBOARDING_KEY, "1");
+  } catch {
+    // ignore
+  }
+  refreshDesktopOnboarding();
+}
+
+function refreshDesktopOnboarding() {
+  if (!desktopOnboardingEl) return;
+  desktopOnboardingEl.hidden = !isDesktopProfile() || isDesktopOnboardingDismissed();
+}
+
+btnDismissDesktopOnboarding?.addEventListener("click", dismissDesktopOnboarding);
+window.addEventListener("resize", refreshDesktopOnboarding, { passive: true });
+refreshDesktopOnboarding();
+
 // --- Accessibility settings ---
 const btnColorblind = document.getElementById("btnColorblind");
 const btnColorblindPause = document.getElementById("btnColorblindPause");

@@ -1,4 +1,4 @@
-import { pickWeighted } from "../core/math.js";
+import { clamp, pickWeighted } from "../core/math.js";
 import { createEnemy } from "./entities.js";
 import { CFG } from "./config.js";
 
@@ -18,6 +18,91 @@ function bossLabel(bt) {
   if (t === "titan") return "TITAN";
   if (t === "sack") return "SAC A PV";
   return String(t).toUpperCase();
+}
+
+function rollAffixForSpawn(game, kind) {
+  const s = game.state;
+  const wave = s?.wave || 1;
+  if (kind === "boss" || wave < 6) return null;
+
+  let chance = 0.035 + Math.min(0.16, Math.max(0, wave - 6) * 0.008);
+  if (kind === "tank" || kind === "shield" || kind === "charger" || kind === "summoner") chance += 0.05;
+  if (game.selectedMapId === "hell") chance += 0.03;
+  if (Math.random() > clamp(chance, 0, 0.34)) return null;
+
+  const pool = [
+    { item: "vampire", w: kind === "walker" || kind === "fast" || kind === "charger" ? 3.2 : 1.8 },
+    { item: "frenzy", w: kind === "fast" || kind === "charger" ? 3.8 : 2.0 },
+    { item: "armored", w: kind === "tank" || kind === "shield" ? 4.8 : 2.6 },
+    { item: "explosive", w: kind === "exploder" ? 0.4 : 2.4 },
+  ];
+  return pickWeighted(pool);
+}
+
+function updateDirector(dt, game) {
+  const s = game.state;
+  const p = game.player;
+  if (!p) return;
+
+  s.directorPressure = clamp(Number(s.directorPressure) || 0, 0, 1);
+  s.directorSpawnMul = clamp(Number(s.directorSpawnMul) || 1, 0.55, 1.45);
+  s.directorBreatheCd = Math.max(0, (s.directorBreatheCd || 0) - dt);
+
+  let nearCount = 0;
+  const nearR2 = 210 * 210;
+  for (let i = 0; i < game.enemies.length; i++) {
+    const e = game.enemies[i];
+    const dx = e.x - p.x;
+    const dy = e.y - p.y;
+    if ((dx * dx + dy * dy) <= nearR2) nearCount += 1;
+  }
+
+  const hpN = clamp((p.hp || 0) / Math.max(1, p.hpMax || 1), 0, 1);
+  const densityN = clamp(game.enemies.length / Math.max(1, CFG.maxEnemies * 0.52), 0, 1);
+  const nearN = clamp(nearCount / 11, 0, 1);
+  const rawPressure = clamp((1 - hpN) * 0.50 + nearN * 0.30 + densityN * 0.20 + (s.bossAlive ? 0.10 : 0), 0, 1);
+  s.directorPressure += (rawPressure - s.directorPressure) * clamp(dt * 1.9, 0, 1);
+
+  s.directorTempoT = (s.directorTempoT || 0) + dt;
+  if ((s.directorTempoT || 0) >= 0.8) {
+    const prev = s.directorKillsPrev || 0;
+    const nowKills = s.kills || 0;
+    const dk = Math.max(0, nowKills - prev);
+    const span = Math.max(0.2, s.directorTempoT || 0.8);
+    const kps = dk / span;
+    s.directorKps = (s.directorKps || 0) * 0.65 + kps * 0.35;
+    s.directorKillsPrev = nowKills;
+    s.directorTempoT = 0;
+  }
+
+  const kpsN = clamp((s.directorKps || 0) / 4.0, 0, 1);
+  const flatness = clamp((1 - s.directorPressure) * 0.62 + (1 - kpsN) * 0.38, 0, 1);
+  s.directorFlatness = flatness;
+
+  let targetMul = 1.0;
+  if (s.directorPressure > 0.84) targetMul = 0.64;
+  else if (s.directorPressure > 0.72) targetMul = 0.78;
+  else if (s.directorPressure < 0.28) targetMul = 1.30;
+  else targetMul = 0.95 + (0.5 - s.directorPressure) * 0.30 + flatness * 0.10;
+  if (s.bossAlive) targetMul *= 0.88;
+  s.directorSpawnMul += (targetMul - s.directorSpawnMul) * clamp(dt * 1.3, 0, 1);
+  s.directorSpawnMul = clamp(s.directorSpawnMul, 0.55, 1.45);
+
+  // If pressure is too high, force a short breathing window.
+  if (!s.bossAlive && s.directorPressure > 0.92 && (s.directorBreatheCd || 0) <= 0) {
+    s.calmT = Math.max(s.calmT || 0, 1.8);
+    s.directorBreatheCd = 7.2;
+    game.floats.push({ x: p.x, y: p.y - 28, ttl: 1.1, text: "RESPIRER" });
+    game.audio?.warning?.("danger");
+  }
+
+  // If combat is too flat, inject a short rush.
+  if (!s.bossAlive && (s.calmT || 0) <= 0 && !s.eventType && flatness > 0.76 && Math.random() < (0.22 * dt)) {
+    s.eventType = "rush";
+    s.eventT = 6.2;
+    game.floats.push({ x: p.x, y: p.y - 28, ttl: 1.1, text: "RUSH" });
+    game.audio?.warning?.("rush");
+  }
 }
 
 export function spawnEnemyAtEdge(game, kind, extra) {
@@ -47,7 +132,9 @@ export function spawnEnemyAtEdge(game, kind, extra) {
     y = cy + h * 0.5 + pad;
   }
 
-  enemies.push(createEnemy({ x, y, kind, wave: state.wave, diff: state.diff, ...(extra || {}) }));
+  const payload = { x, y, kind, wave: state.wave, diff: state.diff, ...(extra || {}) };
+  if (!payload.affix && kind !== "boss") payload.affix = rollAffixForSpawn(game, kind);
+  enemies.push(createEnemy(payload));
 }
 
 export function spawnBoss(game) {
@@ -78,6 +165,7 @@ export function spawnBoss(game) {
     ttl: 1.8,
     text: `BOSS #${game.state.bossCount} - ${bossLabel(bossType)}`,
   });
+  game.audio?.warning?.("boss");
 }
 
 export function updateWaves(dt, game) {
@@ -113,6 +201,7 @@ export function updateWaves(dt, game) {
 
   // base difficulty ramp
   s.difficulty = 1 + s.wave * 0.16;
+  updateDirector(dt, game);
 
   // --- Rhythm: calm windows + lightweight events ---
   s.calmT = Math.max(0, (s.calmT || 0) - dt);
@@ -127,16 +216,20 @@ export function updateWaves(dt, game) {
     }
 
     // Random events (avoid stacking with calm; scale up slowly with wave).
-    if (!isBossWave(s.wave) && (s.calmT || 0) <= 0 && s.wave >= 4 && Math.random() < Math.min(0.26, 0.10 + s.wave * 0.006)) {
+    const evBaseChance = Math.min(0.26, 0.10 + s.wave * 0.006);
+    const evDirMul = (s.directorPressure || 0) > 0.78 ? 0.55 : (s.directorPressure || 0) < 0.35 ? 1.28 : 1;
+    const evChance = clamp(evBaseChance * evDirMul, 0.06, 0.34);
+    if (!isBossWave(s.wave) && (s.calmT || 0) <= 0 && s.wave >= 4 && Math.random() < evChance) {
       const evPool = [
         { item: "rush", w: 10 },
         { item: "elites", w: Math.max(0, s.wave - 6) * 0.8 + 4 },
       ];
       const ev = pickWeighted(evPool);
       s.eventType = ev;
-      s.eventT = ev === "rush" ? 8.5 : 0.9;
+      s.eventT = ev === "rush" ? (7.0 + (s.directorFlatness || 0) * 2.2) : 0.9;
       if (ev === "rush") {
         game.floats.push({ x: game.player.x, y: game.player.y - 28, ttl: 1.35, text: "RUSH" });
+        game.audio?.warning?.("rush");
       } else if (ev === "elites") {
         game.floats.push({ x: game.player.x, y: game.player.y - 28, ttl: 1.35, text: "ELITES" });
         // Spawn a small elite pack immediately.
@@ -161,12 +254,14 @@ export function updateWaves(dt, game) {
   const bossFactor = s.bossAlive ? 0.55 : 1;
   const calmFactor = (s.calmT || 0) > 0 ? 0.12 : 1;
   const evFactor = s.eventType === "rush" && (s.eventT || 0) > 0 ? 1.55 : 1;
+  const dirFactor = clamp(s.directorSpawnMul || 1, 0.55, 1.45);
   const spawnCap = Math.min(22, 12.5 + Math.max(0, (s.wave || 1) - 16) * 0.35);
   const spawnRate =
     Math.max(1.1, Math.min(spawnCap, 1.4 + (s.wave || 1) * 0.24)) *
     bossFactor *
     calmFactor *
     evFactor *
+    dirFactor *
     (s.diff?.spawnMul ?? 1); // enemies/s
   s.spawnAcc += dt * spawnRate;
 

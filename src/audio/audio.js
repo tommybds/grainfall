@@ -894,6 +894,38 @@ export function createAudio() {
     noise({ dur: 0.12, gain: 0.08, out: sfxBus });
   }
 
+  function warning(kind = "danger") {
+    if (muted || !unlocked) return;
+    const k = String(kind || "danger");
+    const cd = k === "boss" ? 1.2 : k === "rush" ? 0.9 : 0.34;
+    if (!can(`warn:${k}`, cd)) return;
+    ensureCtx();
+    ensureBuses();
+    syncBusGains();
+    if (mode === "music") bumpAction(k === "boss" ? 0.20 : 0.08);
+
+    if (k === "boss") {
+      beep({ type: "sawtooth", freq: 190, dur: 0.10, gain: 0.065, out: sfxBus });
+      beep({ type: "sawtooth", freq: 130, dur: 0.14, gain: 0.060, out: sfxBus });
+      return;
+    }
+    if (k === "charge") {
+      beep({ type: "square", freq: 240, dur: 0.06, gain: 0.050, out: sfxBus });
+      beep({ type: "square", freq: 180, dur: 0.07, gain: 0.055, out: sfxBus });
+      return;
+    }
+    if (k === "aoe" || k === "explosive") {
+      beep({ type: "triangle", freq: 310, dur: 0.06, gain: 0.055, out: sfxBus });
+      beep({ type: "triangle", freq: 260, dur: 0.08, gain: 0.060, out: sfxBus });
+      return;
+    }
+    if (k === "shot" || k === "bossShot") {
+      beep({ type: "triangle", freq: 430, dur: 0.05, gain: 0.048, out: sfxBus });
+      return;
+    }
+    beep({ type: "triangle", freq: 360, dur: 0.06, gain: 0.045, out: sfxBus });
+  }
+
   function setMode(v) {
     mode = v === "music" ? "music" : "sfx";
     if (mode === "music") music.actionEnergy = Math.max(0.18, music.actionEnergy || 0);
@@ -1013,6 +1045,7 @@ export function createAudio() {
     pickup,
     levelUp,
     death,
+    warning,
     setMode,
     setScore,
     setIntensity,

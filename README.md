@@ -180,7 +180,7 @@ Pour un déploiement sur un serveur “classique” (Nginx/Apache/CDN), tu veux:
   - soit un cache plus court (ex: `max-age=3600`) si les noms ne changent pas
 
 Avec le setup actuel, `bundle.js` n’est pas hashé, donc préfère un cache court pour `dist/assets/bundle.js`
-ou ajoute un hash de fichier (on peut le faire dans la build si tu veux du `immutable`).
+ou ajoute un hash de fichier.
 
 ## Déploiement
 

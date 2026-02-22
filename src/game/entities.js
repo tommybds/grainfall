@@ -75,9 +75,10 @@ export function createPickup({ x, y, kind, value = 1 }) {
   return { x, y, kind, value, ttl: 16 };
 }
 
-export function createEnemy({ x, y, kind, wave, diff, bossType }) {
+export function createEnemy({ x, y, kind, wave, diff, bossType, affix }) {
   const mHp = diff?.enemyHpMul ?? 1;
   const mSp = diff?.enemySpeedMul ?? 1;
+  const aff = affix || null;
   if (kind === "fast") {
     const hpMax = (22 + wave * 4 + randRange(0, 10)) * mHp;
     return {
@@ -94,6 +95,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 1.22,
       xp: 1,
       isBoss: false,
+      affix: aff,
     };
   }
   if (kind === "tank") {
@@ -112,6 +114,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 1.36,
       xp: 3,
       isBoss: false,
+      affix: aff,
     };
   }
   if (kind === "spitter") {
@@ -130,6 +133,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 0.52,
       xp: 2,
       isBoss: false,
+      affix: aff,
       shootCd: randRange(0.2, 1.0),
       // telegraph before shooting
       windT: 0,
@@ -154,6 +158,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 1.28,
       xp: 3,
       isBoss: false,
+      affix: aff,
       shieldMul: 0.42, // frontal damage multiplier
     };
   }
@@ -173,6 +178,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 1.45,
       xp: 2,
       isBoss: false,
+      affix: aff,
       chargeCd: randRange(0.8, 1.8),
       chargeWindT: 0,
       chargeT: 0,
@@ -196,6 +202,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 0.8,
       xp: 2,
       isBoss: false,
+      affix: aff,
       boomR: 42,
       boomDmg: 26 + wave * 1.2,
     };
@@ -216,6 +223,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 0.95,
       xp: 3,
       isBoss: false,
+      affix: aff,
       summonCd: randRange(1.2, 2.6),
     };
   }
@@ -235,6 +243,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 0.5,
       xp: 3,
       isBoss: false,
+      affix: aff,
       throwCd: randRange(0.8, 2.0),
       throwWindT: 0,
       throwTx: 0,
@@ -257,6 +266,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: 0.65,
       xp: 3,
       isBoss: false,
+      affix: aff,
       fireCd: randRange(1.0, 2.4),
       fireWindT: 0,
       fireTx: 0,
@@ -286,6 +296,7 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
       contactMul: bt === "artillery" ? 0.95 : bt === "sack" ? 1.7 : bt === "titan" ? 1.55 : 1.35,
       xp: bt === "sack" ? 40 : 24,
       isBoss: true,
+      affix: null,
       // shared boss cooldowns (used by patterns in combat.js)
       bossCd: randRange(0.8, 1.6),
       summonCd: 2.5,
@@ -313,5 +324,6 @@ export function createEnemy({ x, y, kind, wave, diff, bossType }) {
     contactMul: 1.15,
     xp: 1,
     isBoss: false,
+    affix: aff,
   };
 }

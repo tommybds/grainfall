@@ -78,6 +78,24 @@ function drawRotatedChar(ctx, x, y, ch, angleRad, alpha = 1) {
   ctx.restore();
 }
 
+function affixStyle(affix) {
+  const a = String(affix || "");
+  if (a === "vampire") return { tag: "V", col: "rgba(120, 255, 170, 0.95)" };
+  if (a === "frenzy") return { tag: "F", col: "rgba(255, 120, 120, 0.95)" };
+  if (a === "armored") return { tag: "B", col: "rgba(130, 200, 255, 0.95)" };
+  if (a === "explosive") return { tag: "X", col: "rgba(255, 180, 90, 0.95)" };
+  return null;
+}
+
+function damageArrowColor(kind, fg, dim) {
+  if (kind === "contact") return "rgba(255, 130, 130, 0.86)";
+  if (kind === "spit" || kind === "shot") return "rgba(255, 180, 110, 0.86)";
+  if (kind === "fire") return "rgba(255, 140, 90, 0.90)";
+  if (kind === "aoe" || kind === "explosive") return "rgba(255, 95, 95, 0.92)";
+  if (kind === "bossShot") return "rgba(255, 95, 155, 0.94)";
+  return dim || rgba(fg || "#f2f2f2", 0.65);
+}
+
 export function renderFrame(game) {
   const { ctx, viewport, camera, player, enemies, bullets, enemyBullets, pickups, floats, hudEl, overlayEl, state } =
     game;
@@ -393,9 +411,14 @@ export function renderFrame(game) {
       continue;
     }
 
-    ctx.fillStyle = kind === "spit" ? "rgba(255, 120, 90, 0.85)" : fgDim;
+    ctx.fillStyle =
+      kind === "spit"
+        ? "rgba(255, 120, 90, 0.90)"
+        : kind === "bossShot"
+          ? "rgba(255, 90, 150, 0.92)"
+          : fgDim;
     ctx.beginPath();
-    ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+    ctx.arc(sx, sy, kind === "bossShot" ? 3 : 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -437,6 +460,24 @@ export function renderFrame(game) {
     const glyphScale = e.isBoss ? 1.55 : elite ? 1.22 : 1;
     drawEntityCharScaled(ctx, sx, sy, ch, glyphScale, e.isBoss ? 1 : 0.95);
 
+    const aff = affixStyle(e.affix);
+    if (aff) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      drawSoftDisc(ctx, sx, sy, elite ? 34 : 24, 0.08);
+      ctx.strokeStyle = aff.col;
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(sx, sy, (e.r || 10) + 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = aff.col;
+      ctx.font = `12px ${CFG.fontFamily}`;
+      drawEntityChar(ctx, sx + (e.r || 10) + 6, sy - (e.r || 10) - 5, aff.tag, 0.95);
+      ctx.restore();
+    }
+
     // Telegraphed spitter shot (small "!" above)
     if (e.kind === "spitter" && (e.windT || 0) > 0) {
       ctx.save();
@@ -446,6 +487,14 @@ export function renderFrame(game) {
       ctx.fillStyle = "rgba(255,160,90,0.95)";
       ctx.font = `18px ${CFG.fontFamily}`;
       drawEntityChar(ctx, sx, sy - 18, "!", 1);
+      const dx = (e.windDx || 0) * 40;
+      const dy = (e.windDy || 0) * 40;
+      ctx.strokeStyle = "rgba(255,120,90,0.85)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + dx, sy + dy);
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -458,6 +507,17 @@ export function renderFrame(game) {
       ctx.fillStyle = "rgba(255,160,90,0.95)";
       ctx.font = `18px ${CFG.fontFamily}`;
       drawEntityChar(ctx, sx, sy - 18, "!", 1);
+      const tx = (e.kind === "grenadier" ? e.throwTx : e.fireTx) ?? e.x;
+      const ty = (e.kind === "grenadier" ? e.throwTy : e.fireTy) ?? e.y;
+      const trx = tx - camera.x;
+      const trgY = ty - camera.y;
+      const rr = e.kind === "grenadier" ? 14 : 18;
+      ctx.globalAlpha = 0.30 + 0.35 * (1 - t);
+      ctx.strokeStyle = e.kind === "grenadier" ? "rgba(255,170,90,0.9)" : "rgba(255,130,90,0.9)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(trx, trgY, rr, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -470,6 +530,14 @@ export function renderFrame(game) {
       ctx.fillStyle = "rgba(255,160,90,0.95)";
       ctx.font = `18px ${CFG.fontFamily}`;
       drawEntityChar(ctx, sx, sy - 18, "!", 1);
+      const dx = (e.chargeDx || 0) * 46;
+      const dy = (e.chargeDy || 0) * 46;
+      ctx.strokeStyle = "rgba(255,110,110,0.88)";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + dx, sy + dy);
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -697,6 +765,9 @@ export function renderFrame(game) {
   const waveLeftStr = `${wmm}:${String(wss).padStart(2, "0")}`;
   const timeStr = formatTimeMMSS(state.t || 0);
   const extra = [`<span>PHASE <span class="v">COMBAT</span></span>`];
+  if (state.running && state.directorPressure !== undefined) {
+    extra.push(`<span>MENACE <span class="v">${Math.round(clamp(state.directorPressure || 0, 0, 1) * 100)}%</span></span>`);
+  }
   // Boss progression: kills + cooldown (see waves.js)
   if (state.bossAlive) {
     const bt = (state.bossType || "").toUpperCase();
@@ -933,7 +1004,9 @@ export function renderFrame(game) {
     const y = cy + Math.sin(a) * r;
     ctx.save();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = rgba(theme.fg || CFG.fg, 0.65 * clamp(t, 0, 1));
+    const arrowCol = damageArrowColor(state.damageKind, theme.fg || CFG.fg, fgDim);
+    ctx.fillStyle = arrowCol;
+    ctx.globalAlpha = clamp(t, 0, 1);
     ctx.font = `22px ${CFG.fontFamily}`;
     drawRotatedChar(ctx, x, y, ">", a, 0.9);
     ctx.restore();

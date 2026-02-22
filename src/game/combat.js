@@ -44,12 +44,56 @@ function killEnemy(game, idx, sourceKind) {
     }
   }
 
+  triggerExplosiveAffix(game, e);
+  if (game.state.gameOver) return;
   maybeDropPickup(game, e.x, e.y, e);
+}
+
+function triggerExplosiveAffix(game, e) {
+  if (!e || e.affix !== "explosive") return;
+  const r = (e.isBoss ? 72 : 48) + (e.kind === "tank" ? 8 : 0);
+  const dmgMul = game.state.diff?.enemyDmgMul ?? 1;
+  const splashEnemy = 18 + (game.state.wave || 1) * 0.45;
+
+  if (game.bullets.length < CFG.maxBullets) {
+    game.bullets.push({ x: e.x, y: e.y, vx: 0, vy: 0, dmg: 0, ttl: 0.24, r: 0, kind: "enemyExplosionFx", radius: r });
+  }
+  game.audio?.warning?.("explosive");
+
+  const p = game.player;
+  if (p && len2(e.x - p.x, e.y - p.y) <= (r + p.r) * (r + p.r)) {
+    const boom = (14 + (game.state.wave || 1) * 0.55) * dmgMul;
+    p.hp -= boom;
+    game.state.hitFlash = Math.max(game.state.hitFlash || 0, 0.20);
+    game.state.damageAngle = Math.atan2(e.y - p.y, e.x - p.x);
+    game.state.damageT = 0.95;
+    game.state.damageKind = "explosive";
+    game.audio?.hit?.(true);
+    game.floats.push({ x: p.x, y: p.y - 18, ttl: 0.8, text: `-${Math.round(boom)}` });
+    if (p.hp <= 0) {
+      p.hp = 0;
+      game.endGame();
+      return;
+    }
+  }
+
+  // Chain reaction on nearby enemies.
+  for (let j = game.enemies.length - 1; j >= 0; j--) {
+    const o = game.enemies[j];
+    if (len2(o.x - e.x, o.y - e.y) > (o.r + r * 0.85) * (o.r + r * 0.85)) continue;
+    o.lastHitKind = "explosive";
+    o.hp -= splashEnemy;
+    if (o.hp <= 0) {
+      killEnemy(game, j, "explosive");
+      if (game.state.gameOver) return;
+    }
+  }
 }
 
 function dealEnemyDamage(game, e, dmg, dirX = 0, dirY = 0) {
   const p = game.player;
   let out = dmg;
+  if (e.affix === "armored") out *= 0.72;
 
   // Shield enemy: reduce frontal hits (enemy "front" faces the player)
   if (e.kind === "shield" && (e.shieldMul || 0) > 0 && (dirX || dirY)) {
@@ -242,6 +286,7 @@ export function updateEnemies(dt, game) {
           e.chargeWindT = 0.28;
           e.chargeDx = toP.x;
           e.chargeDy = toP.y;
+          game.audio?.warning?.("charge");
         }
       }
     }
@@ -265,6 +310,12 @@ export function updateEnemies(dt, game) {
       }
     }
 
+    if (e.affix === "frenzy" && (e.hpMax || 0) > 0) {
+      const hpN = clamp(e.hp / Math.max(1, e.hpMax), 0, 1);
+      const frenzyMul = 1 + (1 - hpN) * 0.65;
+      e.vx *= frenzyMul;
+      e.vy *= frenzyMul;
+    }
     e.x += e.vx * dt;
     e.y += e.vy * dt;
 
@@ -296,6 +347,7 @@ export function updateEnemies(dt, game) {
           e.windDx = dv.x;
           e.windDy = dv.y;
           e.windDmg = 9 + state.wave * 0.6;
+          game.audio?.warning?.("shot");
         }
       }
     }
@@ -340,6 +392,7 @@ export function updateEnemies(dt, game) {
           const lead = 0.25;
           e.throwTx = player.x + (player.vx || 0) * lead;
           e.throwTy = player.y + (player.vy || 0) * lead;
+          game.audio?.warning?.("aoe");
         }
       }
     }
@@ -381,6 +434,7 @@ export function updateEnemies(dt, game) {
           const lead = 0.18;
           e.fireTx = player.x + (player.vx || 0) * lead;
           e.fireTy = player.y + (player.vy || 0) * lead;
+          game.audio?.warning?.("aoe");
         }
       }
     }
@@ -415,6 +469,7 @@ export function updateEnemies(dt, game) {
             e.chargeWindT = 0.32;
             e.chargeDx = toP.x;
             e.chargeDy = toP.y;
+            game.audio?.warning?.("charge");
           }
         }
       }
@@ -433,6 +488,7 @@ export function updateEnemies(dt, game) {
         e.bossCd = (e.bossCd || 0) - dt;
         if ((e.bossCd || 0) <= 0) {
           e.bossCd = clamp(2.1 - state.wave * 0.04, 0.95, 2.1);
+          game.audio?.warning?.("bossShot");
           const aim = norm(player.x - e.x, player.y - e.y);
           const shots = 3 + (state.wave >= 18 ? 2 : state.wave >= 12 ? 1 : 0);
           const spread = 0.18 + Math.min(0.10, state.wave * 0.004);
@@ -482,6 +538,7 @@ export function updateEnemies(dt, game) {
         game.state.hitFlash = 0.22;
         game.state.damageAngle = Math.atan2(e.y - player.y, e.x - player.x);
         game.state.damageT = 0.95;
+        game.state.damageKind = "explosive";
         game.audio?.hit?.(true);
         enemies.splice(i, 1);
         if (player.hp <= 0) {
@@ -492,10 +549,15 @@ export function updateEnemies(dt, game) {
         continue;
       }
       const dps = CFG.contactDpsBase * e.dmgMul * (e.contactMul ?? 1) * contactMul * dmgMul;
-      player.hp -= dps * dt;
+      const dealt = dps * dt;
+      player.hp -= dealt;
+      if (e.affix === "vampire") {
+        e.hp = Math.min(e.hpMax || e.hp, (e.hp || 0) + dealt * 0.65);
+      }
       game.state.hitFlash = 0.12;
       game.state.damageAngle = Math.atan2(e.y - player.y, e.x - player.x);
       game.state.damageT = 0.8;
+      game.state.damageKind = "contact";
       game.audio?.hit?.(true);
       if (player.hp <= 0) {
         player.hp = 0;
@@ -797,6 +859,7 @@ export function updateEnemyBullets(dt, game) {
         game.state.hitFlash = 0.22;
         game.state.damageAngle = Math.atan2(b.y - player.y, b.x - player.x);
         game.state.damageT = 0.95;
+        game.state.damageKind = "aoe";
         game.audio?.hit?.(true);
         game.floats.push({ x: player.x, y: player.y - 18, ttl: 0.8, text: `-${Math.round(boom)}` });
         if (player.hp <= 0) {
@@ -821,6 +884,7 @@ export function updateEnemyBullets(dt, game) {
           game.state.hitFlash = Math.max(game.state.hitFlash || 0, 0.06);
           game.state.damageAngle = Math.atan2(b.y - player.y, b.x - player.x);
           game.state.damageT = Math.max(game.state.damageT || 0, 0.25);
+          game.state.damageKind = "fire";
           if (player.hp <= 0) {
             player.hp = 0;
             game.endGame();
@@ -850,6 +914,7 @@ export function updateEnemyBullets(dt, game) {
       game.state.hitFlash = 0.18;
       game.state.damageAngle = Math.atan2(b.y - player.y, b.x - player.x);
       game.state.damageT = 0.9;
+      game.state.damageKind = b.kind === "bossShot" ? "bossShot" : b.kind === "spit" ? "spit" : "shot";
       game.audio?.hit?.(true);
       enemyBullets.splice(i, 1);
       game.floats.push({ x: player.x, y: player.y - 18, ttl: 0.8, text: `-${Math.round(b.dmg * dmgMul)}` });

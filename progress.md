@@ -139,3 +139,29 @@ Original prompt: fais ça ? Utilise plusieurs boucles par contexte (ex: 3-5 pist
   - `node --check` sur fichiers modifiés OK,
   - `npm run build` OK.
 - Ajustement final: affichage boss corrige pour pointer vers la prochaine vague future (ex: apres boss W5, HUD affiche directement W10).
+
+## Update 9
+- Implémentation du pack global demandé:
+  1) Lisibilité combat
+     - télégraphes renforcés (lignes de direction charge/spit, anneaux de cible pour AOE),
+     - code couleur danger amélioré (projectiles `spit`/`bossShot`, flèche d'impact selon `damageKind`),
+     - ajout d'un indicateur d'affix visuel par élite (`V/F/B/X`).
+  2) Director IA (priorité haute)
+     - calcul en temps réel de la pression (`HP`, densité ennemie, proximité, tempo de kills),
+     - modulation dynamique du spawn (`directorSpawnMul`) pour éviter runs trop plates ou injustes,
+     - respiration forcée courte sous pression extrême + mini-rush automatique si combat trop plat,
+     - affichage HUD `MENACE` (% pression Director).
+  3) Élites avec affixes
+     - spawn affixé progressif à partir de wave 6: `vampire`, `frenzy`, `armored`, `explosive`,
+     - `armored`: réduction dégâts entrants,
+     - `frenzy`: vitesse augmente quand HP baisse,
+     - `vampire`: vol de vie sur dégâts contact,
+     - `explosive`: explosion à la mort (joueur + chaîne légère sur ennemis proches).
+  4) Choix de nouveau stuff trop fréquents
+     - réduction des drops `buff` (plus de `heal`, moins d'ouvertures menu),
+     - cadence level-up menu ralentie (1 choix tous 3/2/1 niveaux selon phase de run),
+     - courbe XP augmentée (`xpToNext`) pour espacer les ouvertures.
+- Audio danger spécifique ajouté (`audio.warning(kind)`): `charge`, `aoe`, `shot`, `bossShot`, `rush`, `boss`, `danger`.
+- Validation sans Playwright:
+  - `node --check` (tous fichiers modifiés) OK,
+  - `npm run build` OK.

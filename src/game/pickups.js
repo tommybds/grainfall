@@ -155,7 +155,7 @@ export function maybeDropPickup(game, x, y, enemy) {
     return;
   }
   // XP is now primarily earned via coins on kills (see combat.js), so we avoid dropping extra XP pickups.
-  if (roll < 0.6) {
+  if (roll < 0.82) {
     game.pickups.push(createPickup({ x, y, kind: "heal", value: enemy.isBoss ? 35 : 18 }));
     return;
   }
@@ -217,7 +217,15 @@ export function applyPickup(game, p) {
       game.audio?.levelUp?.();
     }
     if (gained > 0) {
-      game.openUpgradeMenu?.(gained, "LEVEL UP");
+      // Pace level-up menus: early game gives choices less often to reduce interruption spam.
+      const wave = game.state?.wave || 1;
+      const cadence = wave < 8 ? 3 : wave < 16 ? 2 : 1;
+      const meter = Math.max(0, (game.state?.levelUpsSinceUpgrade || 0) + gained);
+      if (game.state) game.state.levelUpsSinceUpgrade = meter;
+      if (meter >= cadence) {
+        if (game.state) game.state.levelUpsSinceUpgrade = meter - cadence;
+        game.openUpgradeMenu?.(1, "LEVEL UP");
+      }
     }
     return;
   }
@@ -244,10 +252,9 @@ export function applyPickup(game, p) {
 export function xpToNext(level) {
   // fast early game, slower later; ramps harder after ~lvl 15 to avoid upgrade spam.
   const l = Math.max(1, level | 0);
-  const base = 6 + l * 2.6 + l * l * 0.22;
-  const late = l > 15 ? (l - 15) * (l - 15) * 1.6 : 0;
+  const base = 8 + l * 3.1 + l * l * 0.28;
+  const late = l > 12 ? (l - 12) * (l - 12) * 1.95 : 0;
   return Math.round(base + late);
 }
 
 // legacy random upgrades removed (we now use upgrade menu choices)
-

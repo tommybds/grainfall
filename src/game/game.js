@@ -56,7 +56,14 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       nextBossKillsLeft: 0,
       nextBossWave: CFG.bossEvery,
       nextBossWavesLeft: CFG.bossEvery - 1,
+      directorPressure: 0,
+      directorSpawnMul: 1,
+      directorBreatheCd: 0,
+      directorKps: 0,
+      directorTempoT: 0,
+      directorKillsPrev: 0,
       hitFlash: 0,
+      damageKind: "",
       wallBumpT: 0,
       wallBumpX: 0,
       wallBumpY: 0,
@@ -69,6 +76,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       upgradeSource: "",
       // settings (from UI)
       autoUpgrade: false,
+      levelUpsSinceUpgrade: 0,
       // small notification shown in upgrade hint (renderer)
       upgradeToast: "",
       upgradeToastUntilMs: 0,
@@ -169,7 +177,14 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.nextBossKillsLeft = 0;
     game.state.nextBossWave = CFG.bossEvery;
     game.state.nextBossWavesLeft = CFG.bossEvery - 1;
+    game.state.directorPressure = 0;
+    game.state.directorSpawnMul = 1;
+    game.state.directorBreatheCd = 0;
+    game.state.directorKps = 0;
+    game.state.directorTempoT = 0;
+    game.state.directorKillsPrev = 0;
     game.state.hitFlash = 0;
+    game.state.damageKind = "";
     game.state.wallBumpT = 0;
     game.state.wallBumpX = 0;
     game.state.wallBumpY = 0;
@@ -179,6 +194,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.upgradeChoices = [];
     game.state.upgradeCursor = 0;
     game.state.upgradeSource = "";
+    game.state.levelUpsSinceUpgrade = 0;
     game.state.statsMenu = false;
     game.state.tutorialMenu = false;
 

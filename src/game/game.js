@@ -15,7 +15,7 @@ import { difficultyById } from "./difficulty.js";
 import { heroById } from "./heroes.js";
 import { loadHighScore, loadSignedLocal, saveHighScore, saveSignedLocal } from "./storage.js";
 import { createAudio } from "../audio/audio.js";
-import { sampleTile, resolveCircleVsWalls, worldToCell } from "./world.js";
+import { damageWallAtWorld, sampleTile, resolveCircleVsWalls, worldToCell } from "./world.js";
 import { createLifetimeStats, createRunStats, recordRunEnd, updateAchievements } from "./stats.js";
 
 export function createGame({ canvas, ctx, hudEl, overlayEl }) {
@@ -42,27 +42,20 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       kills: 0,
       wave: 1,
       waveJustStarted: false,
-      phase: "combat", // "combat" | "exploration"
-      lastExploreWave: 0,
-      exploreT: 0,
-      exploreDuration: 0,
-      exploreThreat: 0,
-      explorePicked: false,
-      exploreCenterX: 0,
-      exploreCenterY: 0,
-      exploreSites: [],
-      exploreAmbushCd: 0,
       difficulty: 1,
       diff: difficultyById("normal"),
       spawnAcc: 0,
       bossAlive: false,
       bossWave: 0,
+      lastBossWave: 0,
       bossType: "",
       bossCount: 0,
       bossKillsSince: 0,
       bossKillsReq: 0,
       bossCooldownT: 0,
       nextBossKillsLeft: 0,
+      nextBossWave: CFG.bossEvery,
+      nextBossWavesLeft: CFG.bossEvery - 1,
       hitFlash: 0,
       wallBumpT: 0,
       wallBumpX: 0,
@@ -101,6 +94,8 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     floats: [],
     turrets: [],
     discoveredPickups: { xp: false, coin: false, heal: false, buff: false, chest: false },
+    brokenWalls: new Set(),
+    wallDamage: new Map(),
 
     theme: mapById("classic").theme,
     selectedMapId: "classic",
@@ -161,26 +156,19 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.lastMs = performance.now();
     game.state.kills = 0;
     game.state.wave = 1;
-    game.state.phase = "combat";
-    game.state.lastExploreWave = 0;
-    game.state.exploreT = 0;
-    game.state.exploreDuration = 0;
-    game.state.exploreThreat = 0;
-    game.state.explorePicked = false;
-    game.state.exploreCenterX = 0;
-    game.state.exploreCenterY = 0;
-    game.state.exploreSites = [];
-    game.state.exploreAmbushCd = 0;
     game.state.spawnAcc = 0;
     game.state.difficulty = 1;
     game.state.bossAlive = false;
     game.state.bossWave = 0;
+    game.state.lastBossWave = 0;
     game.state.bossType = "";
     game.state.bossCount = 0;
     game.state.bossKillsSince = 0;
     game.state.bossKillsReq = 0;
     game.state.bossCooldownT = 0;
     game.state.nextBossKillsLeft = 0;
+    game.state.nextBossWave = CFG.bossEvery;
+    game.state.nextBossWavesLeft = CFG.bossEvery - 1;
     game.state.hitFlash = 0;
     game.state.wallBumpT = 0;
     game.state.wallBumpX = 0;
@@ -206,6 +194,8 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.floats.length = 0;
     game.turrets.length = 0;
     game.discoveredPickups = { xp: false, heal: false, buff: false, chest: false };
+    game.brokenWalls.clear();
+    game.wallDamage.clear();
     game.camera.x = 0;
     game.camera.y = 0;
   }
@@ -466,9 +456,6 @@ export function runGameLoop(game) {
     if (game.state.running && !game.state.gameOver) {
       if (!game.state.paused) {
         update(dt, game);
-      } else if (game.state.phase === "exploration") {
-        // Keep exploration timer honest even while paused in upgrade/menu overlays.
-        updateWaves(dt, game);
       }
     }
 
@@ -498,7 +485,7 @@ export function runGameLoop(game) {
 function update(dt, game) {
   const s = game.state;
   s.t += dt;
-  if (s.phase !== "exploration") s.waveClock = (s.waveClock || 0) + dt;
+  s.waveClock = (s.waveClock || 0) + dt;
 
   // wave system (spawns + boss)
   updateWaves(dt, game);
@@ -509,8 +496,7 @@ function update(dt, game) {
     const wave = Number(s.wave) || 1;
     const base = Math.max(0, wave - 1) / 14; // ~full intensity around wave 15
     const tBoost = (Number(s.t) || 0) / 240; // gentle ramp if player stalls
-    let x = Math.max(0, Math.min(1, Math.max(base, tBoost)));
-    if (s.phase === "exploration") x *= 0.55;
+    const x = Math.max(0, Math.min(1, Math.max(base, tBoost)));
     game.audio.setIntensity(x);
   }
 
@@ -554,7 +540,7 @@ function update(dt, game) {
 
   // biome effects at player position
   const pc = worldToCell(game.player.x, game.player.y);
-  const tile = sampleTile(game.selectedMapId, pc.cx, pc.cy);
+  const tile = sampleTile(game.selectedMapId, pc.cx, pc.cy, game.brokenWalls);
   const isIce = tile.biome === "ice";
 
   const baseSp = game.player.speed * game.player.buffs.moveSpeedMul;
@@ -598,6 +584,7 @@ function update(dt, game) {
       x: game.player.x,
       y: game.player.y,
       r: game.player.r,
+      brokenWalls: game.brokenWalls,
     });
     game.player.x = res.x;
     game.player.y = res.y;
@@ -653,9 +640,45 @@ function update(dt, game) {
   // clamp enemies against walls (simple)
   for (let i = 0; i < game.enemies.length; i++) {
     const e = game.enemies[i];
-    const res = resolveCircleVsWalls({ mapId: game.selectedMapId, x: e.x, y: e.y, r: e.r });
+    const beforeX = e.x;
+    const beforeY = e.y;
+    const res = resolveCircleVsWalls({
+      mapId: game.selectedMapId,
+      x: e.x,
+      y: e.y,
+      r: e.r,
+      brokenWalls: game.brokenWalls,
+    });
     e.x = res.x;
     e.y = res.y;
+
+    const pushedDx = res.x - beforeX;
+    const pushedDy = res.y - beforeY;
+    const blocked = (pushedDx * pushedDx + pushedDy * pushedDy) > 0.0004;
+    const wantsToMove = ((e.vx || 0) * (e.vx || 0) + (e.vy || 0) * (e.vy || 0)) > 1;
+    if (blocked && wantsToMove) {
+      e.wallGrindT = (e.wallGrindT || 0) + dt;
+      const n = norm(e.vx || 0, e.vy || 0);
+      // Shooters chip less; melee and bosses carve paths faster.
+      let dps = 10;
+      if (e.isBoss) dps = 48;
+      else if (e.kind === "spitter" || e.kind === "grenadier") dps = 8;
+      else if (e.kind === "pyro" || e.kind === "summoner") dps = 11;
+      else dps = 22;
+      if (game.selectedMapId === "hell") dps *= 1.35;
+      if ((e.wallGrindT || 0) >= 0.7) {
+        damageWallAtWorld({
+          mapId: game.selectedMapId,
+          x: e.x + n.x * (e.r + 5),
+          y: e.y + n.y * (e.r + 5),
+          damage: dps * dt,
+          brokenWalls: game.brokenWalls,
+          wallDamage: game.wallDamage,
+        });
+      }
+    } else {
+      e.wallGrindT = Math.max(0, (e.wallGrindT || 0) - dt * 2);
+    }
   }
   updateBullets(dt, game);
   updateEnemyBullets(dt, game);
@@ -765,7 +788,7 @@ function update(dt, game) {
   }
 
   // keep pressure even if player is too safe early: ensure at least a few enemies
-  if (s.phase !== "exploration" && game.enemies.length < 3 && !s.bossAlive) {
+  if (game.enemies.length < 3 && !s.bossAlive) {
     if (Math.random() < 0.05) spawnEnemyAtEdge(game, "walker");
   }
 }

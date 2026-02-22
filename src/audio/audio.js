@@ -144,6 +144,12 @@ export function createAudio() {
       bass: 0,
       perc: 0,
     },
+    externalEl: null,
+    externalNode: null,
+    externalScoreId: "",
+    externalEndedHandler: null,
+    externalErrorHandler: null,
+    failedScores: Object.create(null),
   };
 
   const cd = {
@@ -247,6 +253,10 @@ export function createAudio() {
     return MUSIC_SCORES[scoreId] || MUSIC_SCORES[MUSIC_SCORE_IDS[0]] || null;
   }
 
+  function isExternalScore(sc) {
+    return !!(sc && typeof sc.file === "string" && sc.file.length > 0);
+  }
+
   function rememberRecentScore(id, reset = false) {
     if (!id) return;
     if (reset) music.recentScores.length = 0;
@@ -256,7 +266,9 @@ export function createAudio() {
   }
 
   function pickNextCombatScoreId() {
-    const pool = Array.isArray(music.loopPool) && music.loopPool.length ? music.loopPool : MUSIC_SCORE_IDS;
+    const sourcePool = Array.isArray(music.loopPool) && music.loopPool.length ? music.loopPool : MUSIC_SCORE_IDS;
+    let pool = sourcePool.filter((id) => !music.failedScores[id]);
+    if (!pool.length) pool = sourcePool.slice();
     if (!pool.length) return scoreId;
     const recent = music.recentScores.slice(-SCORE_ANTI_REPEAT);
 
@@ -266,6 +278,103 @@ export function createAudio() {
     if (!candidates.length) candidates = pool.slice();
 
     return candidates[(Math.random() * candidates.length) | 0] || scoreId;
+  }
+
+  function clearExternalTrack() {
+    const el = music.externalEl;
+    if (el) {
+      try {
+        if (music.externalEndedHandler) el.removeEventListener("ended", music.externalEndedHandler);
+        if (music.externalErrorHandler) el.removeEventListener("error", music.externalErrorHandler);
+        el.pause();
+      } catch {
+        // ignore
+      }
+    }
+    if (music.externalNode) {
+      try {
+        music.externalNode.disconnect();
+      } catch {
+        // ignore
+      }
+    }
+    music.externalEl = null;
+    music.externalNode = null;
+    music.externalScoreId = "";
+    music.externalEndedHandler = null;
+    music.externalErrorHandler = null;
+  }
+
+  function playExternalScore(sc, reset = false) {
+    if (!ctx || !musicBus || !isExternalScore(sc)) return false;
+
+    const needNew = !music.externalEl || music.externalScoreId !== sc.id;
+    if (needNew) {
+      clearExternalTrack();
+      const el = new Audio(sc.file);
+      el.preload = "auto";
+      el.loop = false;
+      el.crossOrigin = "anonymous";
+      const onEnded = () => {
+        if (!isMusicActive() || mode !== "music") return;
+        rememberRecentScore(scoreId);
+        const nextId = pickNextCombatScoreId();
+        if (!nextId || !MUSIC_SCORES[nextId]) return;
+        scoreId = nextId;
+        rememberRecentScore(scoreId);
+        const next = currentScore();
+        if (next && isExternalScore(next)) playExternalScore(next, true);
+      };
+      const onError = () => {
+        if (scoreId) music.failedScores[scoreId] = true;
+        rememberRecentScore(scoreId);
+        const nextId = pickNextCombatScoreId();
+        if (!nextId || !MUSIC_SCORES[nextId] || nextId === scoreId) return;
+        scoreId = nextId;
+        rememberRecentScore(scoreId);
+        const next = currentScore();
+        if (next && isExternalScore(next)) playExternalScore(next, true);
+      };
+      el.addEventListener("ended", onEnded);
+      el.addEventListener("error", onError);
+
+      let node = null;
+      try {
+        node = ctx.createMediaElementSource(el);
+        node.connect(musicBus);
+      } catch {
+        // If creating the media source fails, bail out for this score.
+        try {
+          el.pause();
+        } catch {
+          // ignore
+        }
+        return false;
+      }
+
+      music.externalEl = el;
+      music.externalNode = node;
+      music.externalScoreId = sc.id;
+      music.externalEndedHandler = onEnded;
+      music.externalErrorHandler = onError;
+      reset = true;
+    }
+
+    const el = music.externalEl;
+    if (!el) return false;
+    if (reset) {
+      try {
+        el.currentTime = 0;
+      } catch {
+        // ignore
+      }
+    } else if (!el.paused) {
+      return true;
+    }
+
+    const p = el.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+    return true;
   }
 
   function maybeRotateCombatScore(bar) {
@@ -331,6 +440,13 @@ export function createAudio() {
       clearInterval(music.timer);
       music.timer = 0;
     }
+    if (music.externalEl) {
+      try {
+        music.externalEl.pause();
+      } catch {
+        // ignore
+      }
+    }
     music.lastTickT = 0;
   }
 
@@ -341,6 +457,12 @@ export function createAudio() {
     ensureCtx();
     ensureBuses();
     syncBusGains();
+    // Prefer real tracks when available.
+    if (isExternalScore(sc)) {
+      if (!music.recentScores.length) rememberRecentScore(scoreId, true);
+      playExternalScore(sc, false);
+      return;
+    }
     const t = now();
     music.startT = t + 0.02;
     music.step = 0;
@@ -352,7 +474,7 @@ export function createAudio() {
     music.loopPool = MUSIC_SCORE_IDS.slice();
     music.lastTickT = t;
     music.actionEnergy = Math.max(0.18, music.actionEnergy || 0);
-    rememberRecentScore(scoreId, true);
+    if (!music.recentScores.length) rememberRecentScore(scoreId, true);
     music.timer = setInterval(tickScheduler, 25);
   }
 
@@ -781,6 +903,7 @@ export function createAudio() {
 
   function setScore(id) {
     if (id && MUSIC_SCORES[id]) scoreId = id;
+    delete music.failedScores[scoreId];
     rememberRecentScore(scoreId, true);
     music.trackStartBar = Math.floor((music.step || 0) / 16);
     const sc = currentScore();
@@ -821,6 +944,8 @@ export function createAudio() {
 
   function getDebugInfo() {
     const mix = currentStemMix();
+    const sc = currentScore();
+    const sourceType = isExternalScore(sc) ? "track" : "synth";
     const padOn = mix.drone >= 0.18;
     const bassOn = mix.bass >= 0.40;
     const hatOn = mix.perc >= 0.72;
@@ -856,6 +981,9 @@ export function createAudio() {
         context: music.context,
         rotateEveryBars: music.barsPerLoop,
         recentScores: music.recentScores.slice(),
+        sourceType,
+        trackFile: sc?.file || null,
+        failedScores: Object.keys(music.failedScores),
       },
       voices,
       clock: {

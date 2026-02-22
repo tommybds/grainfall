@@ -10,12 +10,16 @@ export function cellToWorldCenter(cx, cy) {
   return { x: (cx + 0.5) * CFG.cellPx, y: (cy + 0.5) * CFG.cellPx };
 }
 
+export function wallKey(cx, cy) {
+  return `${cx},${cy}`;
+}
+
 function hash01(cx, cy, salt = 0) {
   const h = hash2i(cx + salt * 1013, cy - salt * 3251);
   return (h % 100000) / 100000;
 }
 
-export function sampleTile(mapId, cx, cy) {
+function sampleTileBase(mapId, cx, cy) {
   const map = mapById(mapId);
   // Only "ice" biome remains; mud removed.
   const t = map.tiles || { wall: 0.06, ice: 0.04 };
@@ -66,7 +70,50 @@ export function sampleTile(mapId, cx, cy) {
   return { wall: false, biome, glyph };
 }
 
-export function resolveCircleVsWalls({ mapId, x, y, r }) {
+export function wallHpForMap(mapId) {
+  if (mapId === "hell") return 88;
+  if (mapId === "winter") return 112;
+  if (mapId === "classic") return 132;
+  return 140;
+}
+
+export function sampleTile(mapId, cx, cy, brokenWalls) {
+  const tile = sampleTileBase(mapId, cx, cy);
+  if (!tile.wall) return tile;
+  if (!brokenWalls || !brokenWalls.has(wallKey(cx, cy))) return tile;
+  // Broken walls leave subtle rubble so players can read destroyed paths.
+  const rubble = hash01(cx, cy, 9) < 0.5 ? "." : ",";
+  return { wall: false, biome: "normal", glyph: rubble };
+}
+
+export function damageWallCell({ mapId, cx, cy, damage, brokenWalls, wallDamage }) {
+  if (!damage || damage <= 0) return false;
+  if (!brokenWalls || !wallDamage) return false;
+
+  const key = wallKey(cx, cy);
+  if (brokenWalls.has(key)) return false;
+
+  const tile = sampleTileBase(mapId, cx, cy);
+  if (!tile.wall) return false;
+
+  const hp0 = wallDamage.get(key) ?? wallHpForMap(mapId);
+  const hp1 = hp0 - damage;
+  if (hp1 <= 0) {
+    wallDamage.delete(key);
+    brokenWalls.add(key);
+    return true;
+  }
+
+  wallDamage.set(key, hp1);
+  return false;
+}
+
+export function damageWallAtWorld({ mapId, x, y, damage, brokenWalls, wallDamage }) {
+  const c = worldToCell(x, y);
+  return damageWallCell({ mapId, cx: c.cx, cy: c.cy, damage, brokenWalls, wallDamage });
+}
+
+export function resolveCircleVsWalls({ mapId, x, y, r, brokenWalls }) {
   // iterative push-out against neighboring wall cells
   let px = x;
   let py = y;
@@ -76,7 +123,7 @@ export function resolveCircleVsWalls({ mapId, x, y, r }) {
       for (let ox = -1; ox <= 1; ox++) {
         const tx = cx + ox;
         const ty = cy + oy;
-        const tile = sampleTile(mapId, tx, ty);
+        const tile = sampleTile(mapId, tx, ty, brokenWalls);
         if (!tile.wall) continue;
 
         // AABB of the tile in world
@@ -106,4 +153,3 @@ export function resolveCircleVsWalls({ mapId, x, y, r }) {
   }
   return { x: px, y: py };
 }
-

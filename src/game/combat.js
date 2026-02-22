@@ -2,7 +2,7 @@ import { clamp, len2, norm } from "../core/math.js";
 import { CFG } from "./config.js";
 import { createBullet, createPickup } from "./entities.js";
 import { maybeDropPickup } from "./pickups.js";
-import { sampleTile, worldToCell } from "./world.js";
+import { cellToWorldCenter, damageWallAtWorld, damageWallCell, sampleTile, worldToCell } from "./world.js";
 import { recordKill, updateAchievements } from "./stats.js";
 
 function killEnemy(game, idx, sourceKind) {
@@ -102,9 +102,22 @@ function distPointToSegmentSq(px, py, x0, y0, x1, y1) {
   return dx * dx + dy * dy;
 }
 
-function bulletHitWall(mapId, x, y) {
+function bulletHitWall(mapId, x, y, brokenWalls) {
   const c = worldToCell(x, y);
-  return sampleTile(mapId, c.cx, c.cy).wall;
+  return sampleTile(mapId, c.cx, c.cy, brokenWalls).wall;
+}
+
+function wallDamageFromBullet(b) {
+  const k = b.kind || "bullet";
+  if (k === "laser") return 16;
+  if (k === "lance") return 52;
+  if (k === "shotgun") return 24;
+  if (k === "flame") return 9;
+  if (k === "boomerang") return 28;
+  if (k === "mine") return 72;
+  if (k === "turret") return 15;
+  if (k === "tesla") return 0;
+  return 12;
 }
 
 function bounceOrDestroyBullet({
@@ -112,11 +125,14 @@ function bounceOrDestroyBullet({
   prevX,
   prevY,
   mapId,
+  brokenWalls,
   ricochetChance = 0.35,
   dampMin = 0.72,
   dampMax = 0.90,
+  onWallHit,
 }) {
-  if (!bulletHitWall(mapId, bullet.x, bullet.y)) return "none";
+  if (!bulletHitWall(mapId, bullet.x, bullet.y, brokenWalls)) return "none";
+  if (onWallHit) onWallHit();
 
   // Usually destroy; sometimes ricochet.
   if (Math.random() > ricochetChance) return "destroy";
@@ -475,7 +491,7 @@ export function updateEnemies(dt, game) {
         }
         continue;
       }
-      const dps = CFG.contactDpsBase * e.dmgMul * contactMul * dmgMul;
+      const dps = CFG.contactDpsBase * e.dmgMul * (e.contactMul ?? 1) * contactMul * dmgMul;
       player.hp -= dps * dt;
       game.state.hitFlash = 0.12;
       game.state.damageAngle = Math.atan2(e.y - player.y, e.x - player.x);
@@ -606,7 +622,6 @@ export function updateBullets(dt, game) {
       const ex = b.x;
       const ey = b.y;
       const rr = b.explodeR || 60;
-      const rr2 = rr * rr;
       for (let j = enemies.length - 1; j >= 0; j--) {
         const e = enemies[j];
         if (len2(e.x - ex, e.y - ey) <= (e.r + rr) * (e.r + rr)) {
@@ -618,6 +633,27 @@ export function updateBullets(dt, game) {
       // fx ring (rendered in renderer)
       if (bullets.length < CFG.maxBullets) {
         bullets.push({ x: ex, y: ey, vx: 0, vy: 0, dmg: 0, ttl: 0.22, r: 0, kind: "explosionFx", radius: rr });
+      }
+      // Mine blast cracks nearby walls too.
+      const cc = worldToCell(ex, ey);
+      const cr = Math.ceil(rr / CFG.cellPx) + 1;
+      for (let oy = -cr; oy <= cr; oy++) {
+        for (let ox = -cr; ox <= cr; ox++) {
+          const cx = cc.cx + ox;
+          const cy = cc.cy + oy;
+          const wc = cellToWorldCenter(cx, cy);
+          const d = Math.sqrt(len2(wc.x - ex, wc.y - ey));
+          if (d > rr + CFG.cellPx * 0.8) continue;
+          const mul = clamp(1 - d / Math.max(1, rr), 0.25, 1);
+          damageWallCell({
+            mapId: game.selectedMapId,
+            cx,
+            cy,
+            damage: wallDamageFromBullet(b) * mul,
+            brokenWalls: game.brokenWalls,
+            wallDamage: game.wallDamage,
+          });
+        }
       }
       bullets.splice(i, 1);
       continue;
@@ -651,9 +687,20 @@ export function updateBullets(dt, game) {
       prevX,
       prevY,
       mapId: game.selectedMapId,
+      brokenWalls: game.brokenWalls,
       ricochetChance,
       dampMin: 0.70,
       dampMax: 0.88,
+      onWallHit: () => {
+        damageWallAtWorld({
+          mapId: game.selectedMapId,
+          x: b.x,
+          y: b.y,
+          damage: wallDamageFromBullet(b),
+          brokenWalls: game.brokenWalls,
+          wallDamage: game.wallDamage,
+        });
+      },
     });
     if (wallRes === "destroy") {
       bullets.splice(i, 1);
@@ -789,7 +836,10 @@ export function updateEnemyBullets(dt, game) {
     b.y += b.vy * dt;
 
     // Enemy bullets are destroyed on walls (fairness/readability).
-    if (bulletHitWall(game.selectedMapId, b.x, b.y) && !bulletHitWall(game.selectedMapId, prevX, prevY)) {
+    if (
+      bulletHitWall(game.selectedMapId, b.x, b.y, game.brokenWalls) &&
+      !bulletHitWall(game.selectedMapId, prevX, prevY, game.brokenWalls)
+    ) {
       enemyBullets.splice(i, 1);
       continue;
     }
@@ -811,4 +861,3 @@ export function updateEnemyBullets(dt, game) {
     }
   }
 }
-

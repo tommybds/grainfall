@@ -85,3 +85,57 @@ Original prompt: fais ça ? Utilise plusieurs boucles par contexte (ex: 3-5 pist
   - simulation boss actif => pas d’exploration; boss disparu => exploration autorisée,
   - simulation placement POI (classic/winter/hell) => 0 cas invalides sur 120 runs/map,
   - simulation pause+upgrade => `exploreT` tombe bien à 0 et phase repasse `combat`.
+
+## Update 6
+- Basculé le mode musique vers une playlist de fichiers audio externes (5 pistes demandées).
+- `src/audio/musicScores.js` remplace les partitions synthétiques par les 5 morceaux:
+  - OpenGameArt Space Station
+  - OpenGameArt Nebulous
+  - OpenGameArt Space/Scifi Ambient
+  - FMA Space/Sleep/Meditation
+  - Pixabay Space Ambient Cinematic
+- `src/audio/audio.js`:
+  - lecture via `HTMLAudioElement` connecté au bus musique WebAudio,
+  - enchaînement auto des pistes en fin de morceau,
+  - anti-répétition sur les 2 derniers titres,
+  - fallback automatique vers une autre piste en cas d’erreur de chargement.
+- Ajout des crédits/licences et des noms de fichiers attendus dans `src/audio/tracks/CREDITS.md`.
+- Validation: `node --check` + `npm run build` OK.
+
+## Update 7
+- Decision produit appliquee: suppression complete de la phase exploration (plutot qu'une refonte).
+- `src/game/waves.js`:
+  - retrait total de la logique exploration (POI, menace, embuscades, transitions),
+  - boucle de progression des vagues maintenant 100% combat + boss.
+- `src/game/game.js`:
+  - retrait des etats `phase`/`explore*`/`lastExploreWave`,
+  - suppression du traitement special en pause pour exploration,
+  - `waveClock` continue de piloter le timing combat et l'objectif `SURVIVE`.
+- `src/render/renderer.js`:
+  - retrait du rendu des POI exploration,
+  - HUD simplifie avec `PHASE COMBAT` en permanence.
+- Validation sans Playwright:
+  - `node --check src/game/waves.js src/game/game.js src/render/renderer.js` OK,
+  - `npm run build` OK.
+
+## Update 8
+- Rework gameplay suite selon feedback utilisateur:
+  - dégâts de contact rebalancés par type d'ennemi (mêlée plus dangereux, shooters moins punitifs au contact),
+  - boss repassés en cadence déterministe par vagues (`CFG.bossEvery`) au lieu du trigger pur kills,
+  - HUD boss mis à jour (`NEXT BOSS W...`) pour refléter la nouvelle logique.
+- Murs destructibles implémentés:
+  - état runtime: `brokenWalls` + `wallDamage`,
+  - collisions/rendu lisent maintenant les murs cassés (`sampleTile(..., brokenWalls)`),
+  - ennemis qui poussent contre un mur le dégradent progressivement (plus rapide en map `hell`),
+  - certains tirs joueur cassent aussi les murs (impacts de projectiles + explosion de mine).
+- Fichiers principaux touchés:
+  - `src/game/world.js` (API murs destructibles),
+  - `src/game/game.js` (grind ennemi sur murs + état run),
+  - `src/game/combat.js` (dégâts murs par projectiles + contactMul),
+  - `src/game/entities.js` (profil contact par ennemi),
+  - `src/game/waves.js` (boss par vagues),
+  - `src/render/renderer.js` (HUD boss + rendu murs cassés).
+- Validation sans Playwright:
+  - `node --check` sur fichiers modifiés OK,
+  - `npm run build` OK.
+- Ajustement final: affichage boss corrige pour pointer vers la prochaine vague future (ex: apres boss W5, HUD affiche directement W10).

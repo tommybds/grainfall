@@ -77,6 +77,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
       // settings (from UI)
       autoUpgrade: false,
       levelUpsSinceUpgrade: 0,
+      levelUpgradeMenuCount: 0,
       // small notification shown in upgrade hint (renderer)
       upgradeToast: "",
       upgradeToastUntilMs: 0,
@@ -195,6 +196,7 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.upgradeCursor = 0;
     game.state.upgradeSource = "";
     game.state.levelUpsSinceUpgrade = 0;
+    game.state.levelUpgradeMenuCount = 0;
     game.state.statsMenu = false;
     game.state.tutorialMenu = false;
 
@@ -284,26 +286,34 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     game.state.dashReq = true;
   }
 
+  function isLevelUpgradeSource(source = "") {
+    return String(source || "").toUpperCase().includes("LEVEL UP");
+  }
+
   function openUpgradeMenu(count = 1, source = "") {
     if (!count || count <= 0) return;
+    const src = source || game.state.upgradeSource || "";
+    const levelSource = isLevelUpgradeSource(src);
     // If auto-upgrade is enabled (or forced by difficulty), don't show the upgrade menu at all.
     // Apply upgrades immediately so gameplay stays fluid.
     if (shouldAutoUpgrade()) {
       const n = Math.max(1, count | 0);
       for (let k = 0; k < n; k++) {
-        const opts = generateUpgradeChoices(game) || [];
+        const opts = generateUpgradeChoices(game, src) || [];
         if (!opts.length) continue;
         const pick = (Math.random() * Math.min(3, opts.length)) | 0;
         applyUpgradeChoice(game, opts[pick]);
+        if (levelSource) game.state.levelUpgradeMenuCount = (game.state.levelUpgradeMenuCount || 0) + 1;
       }
       return;
     }
 
     game.state.upgradeRemaining = Math.max(1, (game.state.upgradeRemaining || 0) + count);
-    if (source) game.state.upgradeSource = source;
+    if (src) game.state.upgradeSource = src;
     game.state.upgradeMenu = true;
-    game.state.upgradeChoices = generateUpgradeChoices(game);
+    game.state.upgradeChoices = generateUpgradeChoices(game, src);
     game.state.upgradeCursor = 0;
+    if (levelSource) game.state.levelUpgradeMenuCount = (game.state.levelUpgradeMenuCount || 0) + 1;
     // freeze gameplay but keep overlay interaction
     game.state.paused = true;
     game.overlayEl.style.opacity = "1";
@@ -321,8 +331,10 @@ export function createGame({ canvas, ctx, hudEl, overlayEl }) {
     }
     game.state.upgradeRemaining = Math.max(0, (game.state.upgradeRemaining || 1) - 1);
     if (game.state.upgradeRemaining > 0) {
-      game.state.upgradeChoices = generateUpgradeChoices(game);
+      const src = game.state.upgradeSource || "";
+      game.state.upgradeChoices = generateUpgradeChoices(game, src);
       game.state.upgradeCursor = 0;
+      if (isLevelUpgradeSource(src)) game.state.levelUpgradeMenuCount = (game.state.levelUpgradeMenuCount || 0) + 1;
       // If we still have pending upgrades, auto-pick again.
       scheduleAutoUpgradePick();
       return;

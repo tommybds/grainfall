@@ -128,17 +128,12 @@ function applySettingsToAudio() {
 function applyAutoUpgradeSetting() {
   // Easy difficulty always auto-picks (forced), regardless of setting.
   game.state.autoUpgrade = !!settings.autoUpgrade;
-  // If auto is being enabled mid-run while the upgrade menu is open, close it immediately.
-  // Future upgrades will be applied without showing the menu (see openUpgradeMenu).
+  // If auto is enabled while an upgrade menu is already open, resolve it instead of dropping choices.
   if (game.state.autoUpgrade && game.state.upgradeMenu) {
-    game.state.upgradeMenu = false;
-    game.state.upgradeChoices = [];
-    game.state.upgradeCursor = 0;
-    game.state.upgradeRemaining = 0;
-    if (game.state.running && !game.state.gameOver && !game.state.statsMenu && !game.state.tutorialMenu) {
-      game.state.paused = false;
-      game.overlayEl.style.opacity = "0";
-      game.overlayEl.dataset.active = "false";
+    const opts = game.state.upgradeChoices || [];
+    if (opts.length) {
+      const pick = (Math.random() * Math.min(3, opts.length)) | 0;
+      game.chooseUpgrade?.(pick);
     }
   }
 }

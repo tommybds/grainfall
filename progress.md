@@ -199,3 +199,18 @@ Original prompt: fais ça ? Utilise plusieurs boucles par contexte (ex: 3-5 pist
 - Validation:
   - `node --check src/audio/audio.js src/main.js` OK,
   - `npm run build` OK.
+
+## Update 12
+- Upgrade flow ajusté selon feedback:
+  - les pickups `BUFF` (points d'interrogation violets) ne proposent plus d'armes, uniquement buffs/perks,
+  - les `LEVEL UP` ne proposent une option d'arme qu'un menu sur deux (réduction de la fréquence des armes),
+  - les `CHEST` continuent à pouvoir proposer des armes.
+- Auto-upgrade fiabilisé:
+  - si `AUTO UP` est activé alors qu'un menu upgrade est déjà ouvert, le choix en cours est auto-résolu au lieu d'être annulé/supprimé.
+- Fichiers:
+  - `src/game/pickups.js`,
+  - `src/game/game.js`,
+  - `src/main.js`.
+- Validation:
+  - `node --check src/game/pickups.js src/game/game.js src/main.js` OK,
+  - `npm run build` OK.

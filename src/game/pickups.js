@@ -8,9 +8,22 @@ function inc(map, key, n = 1) {
   map[key] = (map[key] || 0) + n;
 }
 
-export function generateUpgradeChoices(game) {
+function shouldOfferWeaponChoice(game, source = "") {
+  const src = String(source || "").toUpperCase();
+  if (src === "BUFF") return false;
+  if (src === "CHEST") return true;
+  if (src.includes("LEVEL UP")) {
+    // Level-up choices: weapon only one menu out of two.
+    const n = Math.max(0, game?.state?.levelUpgradeMenuCount || 0);
+    return (n % 2) === 0;
+  }
+  return true;
+}
+
+export function generateUpgradeChoices(game, source = "") {
   const player = game.player;
   const choices = [];
+  const allowWeaponChoice = shouldOfferWeaponChoice(game, source);
 
   function pushUnique(c) {
     if (choices.some((x) => x.key === c.key)) return false;
@@ -18,8 +31,8 @@ export function generateUpgradeChoices(game) {
     return true;
   }
 
-  // Always include at least one weapon-related choice.
-  {
+  // Include weapon choices only when allowed by source/progression.
+  if (allowWeaponChoice) {
     const options = ["pistol", "shotgun", "lance", "flame", "laser", "mine", "boomerang", "tesla", "turret"];
     const owned = options.filter((id) => player.weapons.some((w) => w.id === id));
     const upgradable = owned.filter((id) => {

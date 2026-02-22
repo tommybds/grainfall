@@ -187,3 +187,15 @@ Original prompt: fais ça ? Utilise plusieurs boucles par contexte (ex: 3-5 pist
   - `node --check src/audio/musicScores.js src/audio/audio.js src/main.js` OK;
   - `npm run build` OK;
   - `dist/audio/tracks` contient bien les `.mp3` copiés.
+
+## Update 11
+- Correctif audio UX:
+  - changement de morceau désormais appliqué immédiatement à la sélection (hot-switch forcé synth<->track et track<->track),
+  - correction du cas où le scheduler synth empêchait le switch vers une piste externe tant que la musique tournait déjà.
+- SFX en mode musique rééquilibrés:
+  - retour des sons de tir (pistol/shotgun/flame/lance) avec niveaux adaptés,
+  - impacts ennemis rehaussés pour rester audibles pendant la musique,
+  - gain global SFX en mode musique augmenté (`0.55 -> 0.78`).
+- Validation:
+  - `node --check src/audio/audio.js src/main.js` OK,
+  - `npm run build` OK.

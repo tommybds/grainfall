@@ -200,7 +200,7 @@ export function createAudio() {
   function syncBusGains() {
     if (!sfxBus || !musicBus) return;
     // In music mode, keep SFX subtle (hits/explosions/pickups) so it doesn't fight the music.
-    const sfxModeMul = mode === "music" ? 0.55 : 1.0;
+    const sfxModeMul = mode === "music" ? 0.78 : 1.0;
     sfxBus.gain.value = clamp01(sfxVol) * sfxModeMul;
     musicBus.gain.value = clamp01(musicVol) * 0.95;
   }
@@ -828,7 +828,7 @@ export function createAudio() {
 
     if (mode === "music") {
       // Decoupled: shots do not trigger notes anymore (keeps music stable).
-      // We only track attempts for debugging and drive stems from action.
+      // We still keep weapon SFX, just quieter than pure SFX mode.
       const pulse =
         kind === "shotgun" ? 0.14
           : kind === "lance" ? 0.11
@@ -836,6 +836,21 @@ export function createAudio() {
               : 0.07;
       bumpAction(pulse);
       dbg.shotAttempts += 1;
+      if (kind === "shotgun") {
+        noise({ dur: 0.022, gain: 0.055, out: sfxBus });
+        beep({ type: "square", freq: 165, dur: 0.05, gain: 0.040, detune: -20, out: sfxBus });
+        return;
+      }
+      if (kind === "flame") {
+        noise({ dur: 0.026, gain: 0.040, out: sfxBus });
+        beep({ type: "sawtooth", freq: 220, dur: 0.042, gain: 0.028, detune: 12, out: sfxBus });
+        return;
+      }
+      if (kind === "lance") {
+        beep({ type: "sawtooth", freq: 230, dur: 0.082, gain: 0.048, detune: -10, out: sfxBus });
+        return;
+      }
+      beep({ type: "square", freq: 420, dur: 0.042, gain: 0.040, out: sfxBus });
       return;
     }
 
@@ -880,7 +895,8 @@ export function createAudio() {
       }
     } else {
       // Enemy hits: much quieter in music mode (and still readable in sfx mode).
-      noise({ dur: 0.014, gain: mode === "music" ? 0.02 : 0.05, out: sfxBus });
+      noise({ dur: 0.016, gain: mode === "music" ? 0.032 : 0.05, out: sfxBus });
+      if (mode === "music") beep({ type: "triangle", freq: 760, dur: 0.028, gain: 0.018, out: sfxBus });
     }
   }
 
@@ -975,14 +991,16 @@ export function createAudio() {
     delete music.failedScores[scoreId];
     rememberRecentScore(scoreId, true);
     music.trackStartBar = Math.floor((music.step || 0) / 16);
-    const sc = currentScore();
-    if (music.timer && sc) {
-      music.stepDur = (60 / (sc.bpm || 110)) / 4;
-      music.introBars = 0;
-    }
     // reset phrase indices so it feels coherent when switching
     music.idx = Object.create(null);
-    syncMusicScheduler();
+    // Force immediate audible switch (synth<->track or track<->track).
+    const active = isMusicActive();
+    stopMusicScheduler();
+    clearExternalTrack();
+    music.step = 0;
+    music.nextT = 0;
+    music.startT = 0;
+    if (active) startMusicScheduler();
   }
 
   function setIntensity(v) {

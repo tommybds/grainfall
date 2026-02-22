@@ -165,3 +165,25 @@ Original prompt: fais ça ? Utilise plusieurs boucles par contexte (ex: 3-5 pist
 - Validation sans Playwright:
   - `node --check` (tous fichiers modifiés) OK,
   - `npm run build` OK.
+
+## Update 10
+- Correctif audio 404 + intégration des musiques libres de droits demandées:
+  - fichiers ajoutés dans `src/audio/tracks`:
+    - `space-station.mp3` (OGA),
+    - `nebulous.mp3` (OGA),
+    - `space-scifi-ambient.mp3` (OGA),
+    - `space-sleep-meditation.mp3` (FMA, piste `Cosmic Waves`, version trim 4 min pour le web).
+  - les sources OGA fournies en `.wav` ont été converties en `.mp3` et les `.wav` temporaires supprimés.
+- Robustesse runtime:
+  - ajout d'un score synth fallback (`ascii_combat_synth`) pour éviter toute panne audio si piste externe indisponible;
+  - anti-boucle d'erreurs: un score externe en échec est marqué et exclu de la rotation automatique;
+  - en cas d'échec, bascule propre vers un score jouable (fallback synth si nécessaire).
+- Rotation/UX:
+  - mode aléatoire côté UI ne choisit plus les scores marqués `rotate: false`;
+  - piste Pixabay conservée en placeholder synth (`file: ""`) car téléchargement CDN bloqué en CLI (403 challenge Cloudflare), ce qui évite toute 404 en jeu.
+- Docs:
+  - `src/audio/tracks/CREDITS.md` mis à jour avec attribution exacte FMA + note Pixabay.
+- Validation:
+  - `node --check src/audio/musicScores.js src/audio/audio.js src/main.js` OK;
+  - `npm run build` OK;
+  - `dist/audio/tracks` contient bien les `.mp3` copiés.

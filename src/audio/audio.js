@@ -5,6 +5,8 @@ let unlocked = false;
 
 import { MUSIC_SCORES, MUSIC_SCORE_IDS } from "./musicScores.js";
 
+const SYNTH_FALLBACK_SCORE_ID = "ascii_combat_synth";
+
 function ensureCtx() {
   if (ctx) return;
   ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -83,7 +85,10 @@ export function createAudio() {
 
   let muted = false;
   let mode = "sfx"; // "sfx" | "music"
-  let scoreId = MUSIC_SCORE_IDS[0] || "a_minor_chill";
+  let scoreId =
+    MUSIC_SCORES[SYNTH_FALLBACK_SCORE_ID]
+      ? SYNTH_FALLBACK_SCORE_ID
+      : (MUSIC_SCORE_IDS[0] || "a_minor_chill");
   let intensity = 0; // 0..1 from game progression
   let backgrounded = false; // page not focused / hidden
   // User-mix volumes (0..1)
@@ -133,7 +138,7 @@ export function createAudio() {
     // Combat-only context for now: rotate loops regularly.
     context: "combat",
     barsPerLoop: COMBAT_ROTATE_BARS,
-    loopPool: MUSIC_SCORE_IDS.slice(),
+    loopPool: MUSIC_SCORE_IDS.filter((id) => MUSIC_SCORES[id]?.rotate !== false),
     recentScores: [],
     trackStartBar: 0,
     // Action intensity (shots/hits/explosions) drives stems.
@@ -257,6 +262,22 @@ export function createAudio() {
     return !!(sc && typeof sc.file === "string" && sc.file.length > 0);
   }
 
+  function fallbackScoreId() {
+    if (MUSIC_SCORES[SYNTH_FALLBACK_SCORE_ID]) return SYNTH_FALLBACK_SCORE_ID;
+    const synth = MUSIC_SCORE_IDS.find((id) => !isExternalScore(MUSIC_SCORES[id]));
+    return synth || MUSIC_SCORE_IDS[0] || scoreId;
+  }
+
+  function scorePoolForRotation() {
+    const sourcePool = Array.isArray(music.loopPool) && music.loopPool.length ? music.loopPool : MUSIC_SCORE_IDS;
+    return sourcePool.filter((id) => {
+      const sc = MUSIC_SCORES[id];
+      if (!sc || sc.rotate === false) return false;
+      if (isExternalScore(sc) && music.failedScores[id]) return false;
+      return true;
+    });
+  }
+
   function rememberRecentScore(id, reset = false) {
     if (!id) return;
     if (reset) music.recentScores.length = 0;
@@ -266,10 +287,8 @@ export function createAudio() {
   }
 
   function pickNextCombatScoreId() {
-    const sourcePool = Array.isArray(music.loopPool) && music.loopPool.length ? music.loopPool : MUSIC_SCORE_IDS;
-    let pool = sourcePool.filter((id) => !music.failedScores[id]);
-    if (!pool.length) pool = sourcePool.slice();
-    if (!pool.length) return scoreId;
+    const pool = scorePoolForRotation();
+    if (!pool.length) return fallbackScoreId();
     const recent = music.recentScores.slice(-SCORE_ANTI_REPEAT);
 
     let candidates = pool.filter((id) => id !== scoreId && !recent.includes(id));
@@ -323,17 +342,29 @@ export function createAudio() {
         scoreId = nextId;
         rememberRecentScore(scoreId);
         const next = currentScore();
-        if (next && isExternalScore(next)) playExternalScore(next, true);
+        if (next && isExternalScore(next)) {
+          playExternalScore(next, true);
+          return;
+        }
+        clearExternalTrack();
+        if (isMusicActive()) startMusicScheduler();
       };
       const onError = () => {
-        if (scoreId) music.failedScores[scoreId] = true;
-        rememberRecentScore(scoreId);
+        const failedId = music.externalScoreId || scoreId;
+        if (failedId) music.failedScores[failedId] = true;
+        rememberRecentScore(failedId);
+        clearExternalTrack();
         const nextId = pickNextCombatScoreId();
-        if (!nextId || !MUSIC_SCORES[nextId] || nextId === scoreId) return;
+        if (!nextId || !MUSIC_SCORES[nextId]) return;
+        if (nextId === failedId) return;
         scoreId = nextId;
         rememberRecentScore(scoreId);
         const next = currentScore();
-        if (next && isExternalScore(next)) playExternalScore(next, true);
+        if (next && isExternalScore(next)) {
+          playExternalScore(next, true);
+          return;
+        }
+        if (isMusicActive()) startMusicScheduler();
       };
       el.addEventListener("ended", onEnded);
       el.addEventListener("error", onError);
@@ -452,7 +483,7 @@ export function createAudio() {
 
   function startMusicScheduler() {
     if (music.timer) return;
-    const sc = currentScore();
+    let sc = currentScore();
     if (!sc) return;
     ensureCtx();
     ensureBuses();
@@ -460,8 +491,14 @@ export function createAudio() {
     // Prefer real tracks when available.
     if (isExternalScore(sc)) {
       if (!music.recentScores.length) rememberRecentScore(scoreId, true);
-      playExternalScore(sc, false);
-      return;
+      const ok = playExternalScore(sc, false);
+      if (ok) return;
+      if (scoreId) music.failedScores[scoreId] = true;
+      clearExternalTrack();
+      scoreId = fallbackScoreId();
+      sc = currentScore();
+      if (!sc || isExternalScore(sc)) return;
+      rememberRecentScore(scoreId, true);
     }
     const t = now();
     music.startT = t + 0.02;
@@ -471,7 +508,7 @@ export function createAudio() {
     music.stepDur = (60 / (sc.bpm || 110)) / 4;
     music.introBars = Math.max(0, (sc.introBars ?? 2) | 0);
     music.trackStartBar = 0;
-    music.loopPool = MUSIC_SCORE_IDS.slice();
+    music.loopPool = MUSIC_SCORE_IDS.filter((id) => MUSIC_SCORES[id]?.rotate !== false);
     music.lastTickT = t;
     music.actionEnergy = Math.max(0.18, music.actionEnergy || 0);
     if (!music.recentScores.length) rememberRecentScore(scoreId, true);

@@ -1,6 +1,6 @@
 # Music Credits
 
-Drop the licensed audio files in this folder with the exact filenames below.
+Music files currently bundled in this folder:
 
 ## Playlist
 
@@ -17,7 +17,7 @@ Drop the licensed audio files in this folder with the exact filenames below.
    License: CC-BY 3.0
 
 4. `space-sleep-meditation.mp3`  
-   Source: https://freemusicarchive.org/music/holiznacc0/space-sleep-meditation  
+   Source track: https://freemusicarchive.org/music/holiznacc0/space-sleep-meditation/cosmic-waves/  
    License: CC0
 
 5. `space-ambient-cinematic.mp3`  
@@ -28,3 +28,4 @@ Drop the licensed audio files in this folder with the exact filenames below.
 
 - Keep proof of license for each file in your project docs/release process.
 - CC-BY tracks require attribution where your game credits are shown.
+- Pixabay download is blocked by Cloudflare challenge in CLI; score currently falls back to synth placeholder until the file is added manually.

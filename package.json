@@ -1,6 +1,6 @@
 {
   "name": "grainfall-ascii",
-  "version": "4.0.2",
+  "version": "4.0.3",
   "private": true,
   "description": "Grainfall: mini jeu type survivor.io en noir & blanc style ASCII, jouable au clavier et tactile.",
   "scripts": {
@@ -16,4 +16,3 @@
     "gulp-plumber": "^1.2.1"
   }
 }
-

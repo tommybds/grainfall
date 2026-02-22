@@ -5,6 +5,8 @@ import { HEROES } from "./game/heroes.js";
 import { loadSignedLocal, saveSignedLocal } from "./game/storage.js";
 import { MUSIC_SCORES, MUSIC_SCORE_IDS } from "./audio/musicScores.js";
 
+const AUTO_MUSIC_SCORE_IDS = MUSIC_SCORE_IDS.filter((id) => MUSIC_SCORES[id]?.rotate !== false);
+
 const APP_VERSION = (() => {
   try {
     // Replaced at build time (esbuild define). In dev (served from src/), fallback to "dev".
@@ -179,7 +181,7 @@ function updateMusicButtons() {
 }
 
 function pickRandomScore(exclude) {
-  const ids = MUSIC_SCORE_IDS;
+  const ids = AUTO_MUSIC_SCORE_IDS.length ? AUTO_MUSIC_SCORE_IDS : MUSIC_SCORE_IDS;
   if (!ids || !ids.length) return null;
   const pool = ids.length > 1 ? ids.filter((id) => id !== exclude) : ids;
   return pool[(Math.random() * pool.length) | 0] || ids[0];

@@ -9,6 +9,8 @@ const { Transform } = require("stream");
 
 const pkg = require("./package.json");
 
+
+
 const paths = {
   src: "src",
   dist: "dist",
